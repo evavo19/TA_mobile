@@ -4,7 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen({super.key});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -45,7 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     String hashedPassword = _hashPassword(password);
-    print("User Registered: $name | $email | Hash: $hashedPassword");
+    debugPrint("User Registered: $name | $email | Hash: $hashedPassword");
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Pendaftaran berhasil! Silakan masuk.')),
@@ -120,7 +120,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   bottom: 32,
                   left: 24,
                   child: Column(
-                    crossAxisAlignment: CrossAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
                       Text(
                         'Buat Akun Baru',

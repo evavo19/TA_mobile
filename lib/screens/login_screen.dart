@@ -1,11 +1,13 @@
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart'; // package: crypto/crypto.dart
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart'; // package: local_auth/local_auth.dart
+import 'package:local_auth/local_auth.dart';
+
+import 'register_screen.dart'; // Import halaman Register
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -15,6 +17,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final LocalAuthentication auth = LocalAuthentication();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   // Fungsi Enkripsi Password (SHA-256)
   String _hashPassword(String password) {
@@ -35,9 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Enkripsi password sebelum diproses/disimpan
+    // Enkripsi password sebelum diproses
     String hashedPassword = _hashPassword(password);
-    print("Password Terenkripsi (SHA-256): $hashedPassword");
+    debugPrint("Password Terenkripsi (SHA-256): $hashedPassword");
 
     // Lanjut ke MainScreen setelah login berhasil
     Navigator.pushReplacementNamed(context, '/main');
@@ -49,6 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
       bool canAuthenticate =
           await auth.canCheckBiometrics || await auth.isDeviceSupported();
       if (!canAuthenticate) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Perangkat tidak mendukung Biometric!')),
         );
@@ -60,65 +70,75 @@ class _LoginScreenState extends State<LoginScreen> {
         options: const AuthenticationOptions(biometricOnly: true),
       );
 
-      if (authenticated) {
+      if (authenticated && mounted) {
         Navigator.pushReplacementNamed(context, '/main');
       }
     } catch (e) {
-      print("Error Biometric: $e");
+      debugPrint("Error Biometric: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF1550B6);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Atas (Gambar / Visual Jogja + Gradasi Biru)
+            // Header Atas (Visual Jogja + Gradasi Biru)
             Stack(
               children: [
                 Container(
-                  height: 280,
+                  height: 260,
+                  width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF0D47A1), // Warna Biru Utama
+                    color: primaryColor,
                     borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(32),
-                      bottomRight: Radius.circular(32),
+                      bottomLeft: Radius.circular(28),
+                      bottomRight: Radius.circular(28),
                     ),
                   ),
                 ),
                 Positioned.fill(
-                  child: Opacity(
-                    opacity: 0.2,
-                    child: Image.network(
-                      'https://res.cloudinary.com/dfciqrwpe/image/upload/v1748938870/candi-prambanan_cpukic.jpg',
-                      fit: BoxFit.cover,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(28),
+                      bottomRight: Radius.circular(28),
+                    ),
+                    child: Opacity(
+                      opacity: 0.15,
+                      child: Image.network(
+                        'https://res.cloudinary.com/dfciqrwpe/image/upload/v1748938870/candi-prambanan_cpukic.jpg',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
-                  bottom: 40,
+                  bottom: 32,
                   left: 24,
                   child: Column(
-                    crossAxisAlignment: CrossAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
                       Text(
                         'Selamat Datang di',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       SizedBox(height: 4),
                       Text(
                         'Jogja Go!',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
+                          fontSize: 30,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      SizedBox(height: 4),
                       Text(
                         'Jelajahi keindahan wisata Yogyakarta',
-                        style: TextStyle(color: Colors.white, fontSize: 14),
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                     ],
                   ),
@@ -126,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
 
             // Form Input Login
             Padding(
@@ -136,11 +156,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Field Email
                   TextField(
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
+                      labelStyle: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.email_outlined,
+                        color: primaryColor,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF6F8FB),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 20,
+                      ),
+                      enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: primaryColor,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -152,9 +194,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: true,
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(
+                      labelStyle: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.lock_outline,
+                        color: primaryColor,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF6F8FB),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 20,
+                      ),
+                      enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: primaryColor,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -164,13 +227,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Tombol Login Utama
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 50,
                     child: ElevatedButton(
                       onPressed: _handleLogin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D47A1),
+                        backgroundColor: primaryColor,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(25),
                         ),
                       ),
                       child: const Text(
@@ -194,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: EdgeInsets.symmetric(horizontal: 8.0),
                         child: Text(
                           'atau masuk dengan',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                       ),
                       Expanded(child: Divider()),
@@ -203,11 +267,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Tombol Opsi Lain (Biometric & Google)
+                  // Tombol Biometric & Google
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // Tombol Biometric (Fingerprint)
                       InkWell(
                         onTap: _handleBiometricLogin,
                         borderRadius: BorderRadius.circular(16),
@@ -219,21 +282,21 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           child: const Icon(
                             Icons.fingerprint,
-                            size: 36,
-                            color: Color(0xFF0D47A1),
+                            size: 32,
+                            color: primaryColor,
                           ),
                         ),
                       ),
-
-                      // Tombol Google Login
                       InkWell(
                         onTap: () {
-                          // Simulasi Login Google langsung masuk
                           Navigator.pushReplacementNamed(context, '/main');
                         },
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(16),
@@ -242,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: const [
                               Icon(
                                 Icons.g_mobiledata,
-                                size: 36,
+                                size: 32,
                                 color: Colors.red,
                               ),
                               SizedBox(width: 4),
@@ -256,6 +319,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Navigasi Pindah ke Register
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Belum punya akun? ',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const RegisterScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Daftar',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

@@ -88,37 +88,56 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           children: [
             // Header Atas (Visual Jogja + Gradasi Biru)
+            // Header Atas (Foto Keraton Terang)
             Stack(
               children: [
+                // Container Gambar Keraton
                 Container(
                   height: 260,
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: primaryColor,
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
                   ),
-                ),
-                Positioned.fill(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
-                    child: Opacity(
-                      opacity: 0.15,
-                      child: Image.network(
-                        'https://res.cloudinary.com/dfciqrwpe/image/upload/v1748938870/candi-prambanan_cpukic.jpg',
-                        fit: BoxFit.cover,
+                    child: Image.network(
+                      'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?q=80&w=1000&auto=format&fit=crop', // Foto Keraton / Jogja
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+
+                // Lapisan Gradasi Gelap Tipis di Bawah (Agar Teks Tetap Jelasi)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(28),
+                        bottomRight: Radius.circular(28),
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
+                        ],
                       ),
                     ),
                   ),
                 ),
+
+                // Teks Header
                 Positioned(
-                  bottom: 32,
+                  bottom: 24,
                   left: 24,
+                  right: 24,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [

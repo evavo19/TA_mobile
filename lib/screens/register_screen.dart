@@ -73,35 +73,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           children: [
             // Header Biru dengan Kurva Melengkung di Bagian Bawah
+            // Header Biru dengan Foto Keraton Terang
             Stack(
               children: [
+                // Container Gambar Keraton
                 Container(
                   height: 240,
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: primaryColor,
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
                   ),
-                ),
-                // Overlay Gambar Ilustrasi/Candi
-                Positioned.fill(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
-                    child: Opacity(
-                      opacity: 0.15,
-                      child: Image.network(
-                        'https://res.cloudinary.com/dfciqrwpe/image/upload/v1748938870/candi-prambanan_cpukic.jpg',
-                        fit: BoxFit.cover,
+                    child: Image.network(
+                      'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?q=80&w=1000&auto=format&fit=crop', // Foto Keraton / Jogja
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+
+                // Lapisan Gradasi Gelap Tipis di Bawah
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(28),
+                        bottomRight: Radius.circular(28),
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(
+                            0.3,
+                          ), // Bayangan halus untuk tombol back
+                          Colors.black.withOpacity(
+                            0.7,
+                          ), // Bayangan untuk teks bawah
+                        ],
                       ),
                     ),
                   ),
                 ),
+
                 // Tombol Back Navigation
                 Positioned(
                   top: 48,
@@ -115,10 +135,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
+
                 // Judul Header
                 Positioned(
-                  bottom: 32,
+                  bottom: 24,
                   left: 24,
+                  right: 24,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [

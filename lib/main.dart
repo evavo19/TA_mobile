@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/login_screen.dart'; // Menunjuk ke folder screens/
+import 'auth/login_screen.dart'; // Menunjuk ke folder screens/
 import 'screens/main_screen.dart'; // Menunjuk ke folder screens/
 
 void main() {

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,6 +16,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  // Variable visibilitas password
+  bool _isObscurePassword = true;
+  bool _isObscureConfirmPassword = true;
 
   String _hashPassword(String password) {
     var bytes = utf8.encode(password);
@@ -32,14 +37,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password.isEmpty ||
         confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Semua bidang wajib diisi!')),
+        SnackBar(
+          content: Text(
+            'Semua bidang wajib diisi!',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
       );
       return;
     }
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Konfirmasi password tidak cocok!')),
+        SnackBar(
+          content: Text(
+            'Konfirmasi password tidak cocok!',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
       );
       return;
     }
@@ -48,7 +63,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     debugPrint("User Registered: $name | $email | Hash: $hashedPassword");
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pendaftaran berhasil! Silakan masuk.')),
+      SnackBar(
+        content: Text(
+          'Pendaftaran berhasil! Silakan masuk.',
+          style: GoogleFonts.poppins(),
+        ),
+      ),
     );
 
     Navigator.pop(context);
@@ -65,97 +85,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF1550B6); // Biru khas Jogja Go!
+    const primaryColor = Color(0xFF1550B6);
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Biru dengan Kurva Melengkung di Bagian Bawah
-            // Header Biru dengan Foto Keraton Terang
+            // Header Atas
             Stack(
               children: [
-                // Container Gambar Keraton
                 Container(
                   height: 240,
                   width: double.infinity,
                   decoration: const BoxDecoration(
+                    color: primaryColor,
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
                   ),
+                ),
+                Positioned.fill(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
-                    child: Image.network(
-                      'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?q=80&w=1000&auto=format&fit=crop', // Foto Keraton / Jogja
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-
-                // Lapisan Gradasi Gelap Tipis di Bawah
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(28),
-                        bottomRight: Radius.circular(28),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(
-                            0.3,
-                          ), // Bayangan halus untuk tombol back
-                          Colors.black.withOpacity(
-                            0.7,
-                          ), // Bayangan untuk teks bawah
-                        ],
+                    child: Opacity(
+                      opacity: 0.2,
+                      child: Image.network(
+                        'https://i.ibb.co.com/TBwcqkbc/tugu-jogja-HD.png',
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
                 ),
-
-                // Tombol Back Navigation
                 Positioned(
-                  top: 48,
-                  left: 16,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-
-                // Judul Header
-                Positioned(
-                  bottom: 24,
+                  bottom: 32,
                   left: 24,
                   right: 24,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Buat Akun Baru',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       Text(
                         'Bergabunglah dan jelajahi keindahan Jogja',
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -188,6 +175,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: 'Password',
                     icon: Icons.lock_outline,
                     isPassword: true,
+                    isObscure: _isObscurePassword,
+                    onToggleObscure: () {
+                      setState(() {
+                        _isObscurePassword = !_isObscurePassword;
+                      });
+                    },
                   ),
                   const SizedBox(height: 16),
                   _buildInputField(
@@ -195,26 +188,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: 'Konfirmasi Password',
                     icon: Icons.lock_reset,
                     isPassword: true,
+                    isObscure: _isObscureConfirmPassword,
+                    onToggleObscure: () {
+                      setState(() {
+                        _isObscureConfirmPassword = !_isObscureConfirmPassword;
+                      });
+                    },
                   ),
 
                   const SizedBox(height: 28),
 
-                  // Tombol Utama (Capsule Radius khas referensi UI)
+                  // Tombol Daftar
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: _handleRegister,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
+                          borderRadius: BorderRadius.circular(26),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Daftar Sekarang',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -229,15 +228,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Sudah punya akun? ',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                        style: GoogleFonts.poppins(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Text(
+                        child: Text(
                           'Masuk',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             color: primaryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -256,22 +258,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Widget Helper untuk Input Field Konsisten
   Widget _buildInputField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     bool isPassword = false,
+    bool isObscure = true, // Mengamankan nilai default agar tidak null
+    VoidCallback? onToggleObscure,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return TextField(
       controller: controller,
-      obscureText: isPassword,
+      obscureText: isPassword ? isObscure : false,
       keyboardType: keyboardType,
+      style: GoogleFonts.poppins(fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+        labelStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
         prefixIcon: Icon(icon, color: const Color(0xFF1550B6)),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  isObscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.grey,
+                ),
+                onPressed: onToggleObscure,
+              )
+            : null,
         filled: true,
         fillColor: const Color(0xFFF6F8FB),
         contentPadding: const EdgeInsets.symmetric(

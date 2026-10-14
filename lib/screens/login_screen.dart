@@ -2,9 +2,10 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
 
-import 'register_screen.dart'; // Import halaman Register
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +19,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final LocalAuthentication auth = LocalAuthentication();
 
+  // Variable untuk kontrol visibilitas password
+  bool _isObscure = true;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -25,34 +29,34 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Fungsi Enkripsi Password (SHA-256)
   String _hashPassword(String password) {
     var bytes = utf8.encode(password);
     var digest = sha256.convert(bytes);
     return digest.toString();
   }
 
-  // Fungsi Login Biasa
   void _handleLogin() {
     String email = _emailController.text.trim();
     String password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email dan Password wajib diisi!')),
+        SnackBar(
+          content: Text(
+            'Email dan Password wajib diisi!',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
       );
       return;
     }
 
-    // Enkripsi password sebelum diproses
     String hashedPassword = _hashPassword(password);
     debugPrint("Password Terenkripsi (SHA-256): $hashedPassword");
 
-    // Lanjut ke MainScreen setelah login berhasil
     Navigator.pushReplacementNamed(context, '/main');
   }
 
-  // Fungsi Login Biometric
   Future<void> _handleBiometricLogin() async {
     try {
       bool canAuthenticate =
@@ -60,13 +64,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!canAuthenticate) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perangkat tidak mendukung Biometric!')),
+          SnackBar(
+            content: Text(
+              'Perangkat tidak mendukung Biometric!',
+              style: GoogleFonts.poppins(),
+            ),
+          ),
         );
         return;
       }
 
       bool authenticated = await auth.authenticate(
-        localizedReason: 'Pindai sidik jari/wajah untuk masuk ke Jogja Go!',
+        localizedReason:
+            'Pindai sidik jari/wajah untuk masuk ke LelunganJogja!',
         options: const AuthenticationOptions(biometricOnly: true),
       );
 
@@ -87,84 +97,71 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Atas (Visual Jogja + Gradasi Biru)
-            // Header Atas (Foto Keraton Terang)
+            // Header Atas (Warna Biru + Gambar Tugu Jogja Transparan)
             Stack(
               children: [
-                // Container Gambar Keraton
                 Container(
                   height: 260,
                   width: double.infinity,
                   decoration: const BoxDecoration(
+                    color: primaryColor,
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
                   ),
+                ),
+                Positioned.fill(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
                     ),
-                    child: Image.network(
-                      'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?q=80&w=1000&auto=format&fit=crop', // Foto Keraton / Jogja
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-
-                // Lapisan Gradasi Gelap Tipis di Bawah (Agar Teks Tetap Jelasi)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(28),
-                        bottomRight: Radius.circular(28),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
+                    child: Opacity(
+                      opacity: 0.2,
+                      child: Image.network(
+                        'https://i.ibb.co.com/TBwcqkbc/tugu-jogja-HD.png',
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
                 ),
-
-                // Teks Header
                 Positioned(
-                  bottom: 24,
+                  bottom: 32,
                   left: 24,
                   right: 24,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Selamat Datang di',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Jogja Go!',
-                        style: TextStyle(
+                        'LelunganJogja!',
+                        style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 30,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         'Jelajahi keindahan wisata Yogyakarta',
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 28),
 
             // Form Input Login
@@ -176,9 +173,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    style: GoogleFonts.poppins(fontSize: 14),
                     decoration: InputDecoration(
                       labelText: 'Email',
-                      labelStyle: const TextStyle(
+                      labelStyle: GoogleFonts.poppins(
                         color: Colors.grey,
                         fontSize: 14,
                       ),
@@ -207,19 +205,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Field Password
+                  // Field Password + Ikon Mata Toggle
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _isObscure,
+                    style: GoogleFonts.poppins(fontSize: 14),
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      labelStyle: const TextStyle(
+                      labelStyle: GoogleFonts.poppins(
                         color: Colors.grey,
                         fontSize: 14,
                       ),
                       prefixIcon: const Icon(
                         Icons.lock_outline,
                         color: primaryColor,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isObscure
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isObscure = !_isObscure;
+                          });
+                        },
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF6F8FB),
@@ -241,113 +253,70 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
 
-                  // Tombol Login Utama
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                      child: const Text(
-                        'Masuk',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Pembatas Atau
+                  // Tombol Masuk + Sidik Jari Sampingan
                   Row(
-                    children: const [
-                      Expanded(child: Divider()),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Text(
-                          'atau masuk dengan',
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
-                        ),
-                      ),
-                      Expanded(child: Divider()),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Tombol Biometric & Google
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      // Tombol Masuk Utama
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                            ),
+                            child: Text(
+                              'Masuk',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Tombol Sidik Jari
                       InkWell(
                         onTap: _handleBiometricLogin,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(26),
                         child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(16),
+                          width: 52,
+                          height: 52,
+                          decoration: const BoxDecoration(
+                            color: primaryColor,
+                            shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.fingerprint,
-                            size: 32,
-                            color: primaryColor,
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          Navigator.pushReplacementNamed(context, '/main');
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: const [
-                              Icon(
-                                Icons.g_mobiledata,
-                                size: 32,
-                                color: Colors.red,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Google',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ],
+                            color: Colors.white,
+                            size: 28,
                           ),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
                   // Navigasi Pindah ke Register
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Belum punya akun? ',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                        style: GoogleFonts.poppins(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
                       ),
                       GestureDetector(
                         onTap: () {
@@ -358,9 +327,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           'Daftar',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             color: primaryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,

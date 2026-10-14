@@ -1,6 +1,6 @@
 name: pemesanan_tiket
 description: "Aplikasi Pemesanan Tiket Wisata Jogja bernama 'Lelungan Jogja' "
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -10,13 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  google_fonts: ^6.1.0 # Tambahkan ini untuk font Poppins
 
   # Icon bawaan Flutter
   cupertino_icons: ^1.0.8
 
   # Paket Tambahan Tugas Akhir PAM:
-  crypto: ^3.0.3        # Enkripsi Password (SHA-256)
-  local_auth: ^2.1.6    # Login Biometric (Fingerprint/Face ID)
+  crypto: ^3.0.3 # Enkripsi Password (SHA-256)
+  local_auth: ^2.1.6 # Login Biometric (Fingerprint/Face ID)
 
 dev_dependencies:
   flutter_test:

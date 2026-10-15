@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'profil_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -15,7 +16,7 @@ class _MainScreenState extends State<MainScreen> {
     const PlaceholderHomeScreen(),
     const PlaceholderTicketsScreen(),
     const PlaceholderAiScreen(),
-    const PlaceholderProfileScreen(),
+    const PlaceholderProfilScreen(),
   ];
 
   @override

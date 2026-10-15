@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../features/feedback.dart';
-import '../features/game.dart'; // Sesuaikan jika nama file game kamu quiz.dart atau game.dart
+import '../features/game.dart';
+import '../services/gps_service.dart';
 
 class PlaceholderProfilScreen extends StatefulWidget {
   const PlaceholderProfilScreen({super.key});
@@ -344,7 +345,14 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     icon: Icons.near_me_outlined,
                     title: 'Wisata Terdekat (LBS)',
                     subtitle: 'Peta & jarak lokasi wisata dari Anda',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LbsScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   // Game Tangkap Tiket

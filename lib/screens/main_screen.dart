@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'profil_screen.dart';
+import '../features/chatbot.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -15,7 +16,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _pages = [
     const PlaceholderHomeScreen(),
     const PlaceholderTicketsScreen(),
-    const PlaceholderAiScreen(),
+    const PlaceholderChatbotScreen(),
     const PlaceholderProfilScreen(),
   ];
 
@@ -62,7 +63,7 @@ class _MainScreenState extends State<MainScreen> {
 
 // Widget Tampilan Sementara (Placeholder)
 class PlaceholderHomeScreen extends StatelessWidget {
-  const PlaceholderHomeScreen({Key? key}) : super(key: key);
+  const PlaceholderHomeScreen({super.key});
   @override
   Widget build(BuildContext context) {
     return const Center(child: Text('Halaman Beranda (Home)'));
@@ -70,7 +71,7 @@ class PlaceholderHomeScreen extends StatelessWidget {
 }
 
 class PlaceholderTicketsScreen extends StatelessWidget {
-  const PlaceholderTicketsScreen({Key? key}) : super(key: key);
+  const PlaceholderTicketsScreen({super.key});
   @override
   Widget build(BuildContext context) {
     return const Center(child: Text('Halaman Tiket Saya'));
@@ -78,7 +79,7 @@ class PlaceholderTicketsScreen extends StatelessWidget {
 }
 
 class PlaceholderAiScreen extends StatelessWidget {
-  const PlaceholderAiScreen({Key? key}) : super(key: key);
+  const PlaceholderAiScreen({super.key});
   @override
   Widget build(BuildContext context) {
     return const Center(child: Text('Halaman Asisten AI'));
@@ -86,7 +87,7 @@ class PlaceholderAiScreen extends StatelessWidget {
 }
 
 class PlaceholderProfileScreen extends StatelessWidget {
-  const PlaceholderProfileScreen({Key? key}) : super(key: key);
+  const PlaceholderProfileScreen({super.key});
   @override
   Widget build(BuildContext context) {
     return const Center(child: Text('Halaman Profil'));

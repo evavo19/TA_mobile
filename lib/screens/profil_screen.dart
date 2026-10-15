@@ -135,7 +135,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         // Jenis Kelamin
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: selectedGender,
+                            initialValue: selectedGender,
                             style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
                             decoration: InputDecoration(
                               labelText: 'Gender',

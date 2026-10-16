@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: Text(category),
                       labelStyle: GoogleFonts.poppins(
                         fontSize: 13,
-                        color: isSelected ? Colors.white : Colors.slate600,
+                        color: isSelected ? Colors.white : Colors.grey.shade600,
                         fontWeight: isSelected
                             ? FontWeight.bold
                             : FontWeight.w500,
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       elevation: isSelected ? 2 : 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide(
+                        side: BorderSide(
                           color: isSelected
                               ? primaryColor
                               : Colors.grey.shade300,

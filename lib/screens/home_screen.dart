@@ -15,6 +15,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final supabase = Supabase.instance.client;
 
+  late final Future<List<WisataModel>> _wisataFuture;
+
   String _searchQuery = '';
   String _selectedCategory = 'Semua';
 
@@ -23,14 +25,20 @@ class _HomeScreenState extends State<HomeScreen> {
     'Alam',
     'Budaya Dan Sejarah',
     'Kuliner',
-    'Belanja',
   ];
 
-  // Mengambil data dari tabel 'wisata' di Supabase
+  @override
+  void initState() {
+    super.initState();
+    _wisataFuture = _fetchWisata();
+  }
+
   Future<List<WisataModel>> _fetchWisata() async {
     final response = await supabase.from('wisata').select();
     final data = response as List<dynamic>;
-    return data.map((e) => WisataModel.fromMap(e)).toList();
+    return data
+        .map((e) => WisataModel.fromMap(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -56,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Search Bar
+            // Search bar
             Container(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               decoration: const BoxDecoration(
@@ -68,9 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: TextField(
                 onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.toLowerCase();
-                  });
+                  setState(() => _searchQuery = value.toLowerCase());
                 },
                 style: GoogleFonts.poppins(fontSize: 14),
                 decoration: InputDecoration(
@@ -90,7 +96,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // Section Filter Kategori
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Text(
@@ -104,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Horizontal Category Chips
+            // Chip kategori
             SizedBox(
               height: 40,
               child: ListView.builder(
@@ -119,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: FilterChip(
                       selected: isSelected,
                       label: Text(category),
+                      showCheckmark: false,
                       labelStyle: GoogleFonts.poppins(
                         fontSize: 13,
                         color: isSelected ? Colors.white : Colors.grey.shade600,
@@ -137,10 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               : Colors.grey.shade300,
                         ),
                       ),
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedCategory = category;
-                        });
+                      onSelected: (_) {
+                        setState(() => _selectedCategory = category);
                       },
                     ),
                   );
@@ -150,7 +154,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // Section Judul List Wisata
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Text(
@@ -164,9 +167,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Fetch & Render Daftar Kartu Wisata
+            // Daftar wisata
             FutureBuilder<List<WisataModel>>(
-              future: _fetchWisata(),
+              future: _wisataFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -192,7 +195,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 final allWisata = snapshot.data ?? [];
 
-                // Logic Filter berdasarkan Search & Kategori
                 final filteredWisata = allWisata.where((wisata) {
                   final matchesSearch = wisata.nama.toLowerCase().contains(
                     _searchQuery,
@@ -239,7 +241,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
                         onTap: () {
-                          // Pindah ke Detail Wisata
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -251,7 +252,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Foto Wisata
                             ClipRRect(
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(20),
@@ -273,8 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                               ),
                             ),
-
-                            // Informasi Wisata
                             Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
@@ -342,7 +340,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        'Rp ${wisata.hargaWeekday.toStringAsFixed(0)} / tiket',
+                                        wisata.hargaWeekday == 0
+                                            ? 'Gratis'
+                                            : 'Rp ${wisata.hargaWeekday} / tiket',
                                         style: GoogleFonts.poppins(
                                           color: primaryColor,
                                           fontWeight: FontWeight.bold,

@@ -6,11 +6,11 @@ class WisataModel {
   final int jumlahUlasan;
   final int hargaWeekday;
   final int hargaWeekend;
-  final String deskripsi;
+  final double latitude;
+  final double longitude;
   final String gambarUrl;
-  final String jamBuka;
-  final double? latitude;
-  final double? longitude;
+  final String deskripsi;
+  final String jamBuka; 
 
   WisataModel({
     required this.id,
@@ -20,46 +20,26 @@ class WisataModel {
     required this.jumlahUlasan,
     required this.hargaWeekday,
     required this.hargaWeekend,
-    required this.deskripsi,
+    required this.latitude,
+    required this.longitude,
     required this.gambarUrl,
+    required this.deskripsi,
     required this.jamBuka,
-    this.latitude,
-    this.longitude,
   });
 
-  // Mengubah Map/JSON dari Supabase ke WisataModel
-  factory WisataModel.fromMap(Map<String, dynamic> map) {
-    return WisataModel(
-      id: map['id'] ?? 0,
-      nama: map['nama'] ?? '',
-      kategori: map['kategori'] ?? '',
-      rating: (map['rating'] ?? 0.0).toDouble(),
-      jumlahUlasan: map['jumlah_ulasan'] ?? 0,
-      hargaWeekday: map['harga_weekday'] ?? 0,
-      hargaWeekend: map['harga_weekend'] ?? 0,
-      deskripsi: map['deskripsi'] ?? '',
-      gambarUrl: map['gambar_url'] ?? map['foto'] ?? '',
-      jamBuka: map['jam_buka'] ?? '08.00 - 17.00 WIB',
-      latitude: map['latitude'] != null ? (map['latitude']).toDouble() : null,
-      longitude: map['longitude'] != null ? (map['longitude']).toDouble() : null,
-    );
-  }
-
-  // Mengubah WisataModel ke Map (jika butuh simpan/update ke Supabase)
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'nama': nama,
-      'kategori': kategori,
-      'rating': rating,
-      'jumlah_ulasan': jumlahUlasan,
-      'harga_weekday': hargaWeekday,
-      'harga_weekend': hargaWeekend,
-      'deskripsi': deskripsi,
-      'gambar_url': gambarUrl,
-      'jam_buka': jamBuka,
-      'latitude': latitude,
-      'longitude': longitude,
-    };
-  }
+  factory WisataModel.fromMap(Map<String, dynamic> m) => WisataModel(
+        id: (m['id'] ?? 0) as int,
+        nama: m['nama'] ?? '',
+        kategori: m['kategori'] ?? '',
+        rating: (m['rating'] ?? 0).toDouble(),
+        jumlahUlasan: (m['jumlah_ulasan'] ?? 0) as int,
+        hargaWeekday: (m['harga_weekday'] ?? 0) as int,
+        hargaWeekend: (m['harga_weekend'] ?? 0) as int,
+        latitude: (m['latitude'] ?? 0).toDouble(),
+        longitude: (m['longitude'] ?? 0).toDouble(),
+        // Mendukung kolom gambar_url, foto_url, maupun foto
+        gambarUrl: m['gambar_url'] ?? m['foto_url'] ?? m['foto'] ?? '',
+        deskripsi: m['deskripsi'] ?? '',
+        jamBuka: m['jam_buka'] ?? m['jamBuka'] ?? '08.00 - 17.00 WIB',
+      );
 }

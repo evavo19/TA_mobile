@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'profil_screen.dart';
-import '../features/chatbot.dart';
+
+import 'home_screen.dart'; // Import HomeScreen kamu
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -10,86 +10,50 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  int _index = 0;
 
-  // Daftar 4 Layar Utama
-  final List<Widget> _pages = [
-    const PlaceholderHomeScreen(),
-    const PlaceholderTicketsScreen(),
-    const PlaceholderChatbotScreen(),
-    const PlaceholderProfilScreen(),
+  // 1. TAMBAHKAN Halaman ke-4 di List _pages ini
+  final List<Widget> _pages = const [
+    HomeScreen(), // Tab 0: Beranda
+    Center(child: Text('Tiket Saya')), // Tab 1: Tiket Saya
+    Center(child: Text('Asisten AI')), // Tab 2: Asisten AI
+    Center(child: Text('Profil')), // Tab 3: Profil
   ];
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF1550B6);
+
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: const Color(0xFF0D47A1),
+        currentIndex: _index,
+        selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey,
+        // Properti ini penting agar 4 item tampil rapi & berlabel jelas
         type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: (i) => setState(() => _index = i),
+
+        // 2. TAMBAHKAN Item ke-4 di List items ini
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
+            icon: Icon(Icons.home_rounded),
             label: 'Beranda',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.confirmation_number_outlined),
-            activeIcon: Icon(Icons.confirmation_number),
+            icon: Icon(Icons.confirmation_number_rounded),
             label: 'Tiket Saya',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.smart_toy_outlined),
-            activeIcon: Icon(Icons.smart_toy),
+            icon: Icon(Icons.smart_toy_rounded), // Ikon Robot / AI
             label: 'Asisten AI',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+            icon: Icon(Icons.person_rounded),
             label: 'Profil',
           ),
         ],
       ),
     );
-  }
-}
-
-// Widget Tampilan Sementara (Placeholder)
-class PlaceholderHomeScreen extends StatelessWidget {
-  const PlaceholderHomeScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Halaman Beranda (Home)'));
-  }
-}
-
-class PlaceholderTicketsScreen extends StatelessWidget {
-  const PlaceholderTicketsScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Halaman Tiket Saya'));
-  }
-}
-
-class PlaceholderAiScreen extends StatelessWidget {
-  const PlaceholderAiScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Halaman Asisten AI'));
-  }
-}
-
-class PlaceholderProfileScreen extends StatelessWidget {
-  const PlaceholderProfileScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Halaman Profil'));
   }
 }

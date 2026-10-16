@@ -21,6 +21,124 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isObscurePassword = true;
   bool _isObscureConfirmPassword = true;
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  // Helper Custom Pop-up Dialog
+  void _showCustomDialog({
+    required String title,
+    required String message,
+    required bool isSuccess,
+    VoidCallback? onSuccessPressed,
+  }) {
+    const primaryColor = Color(0xFF1550B6);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          elevation: 0,
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 28.0,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Ikon Lingkaran Khas UI Jogja Go
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: isSuccess
+                        ? const Color(0xFFE8F1FF)
+                        : const Color(0xFFFFEBEE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSuccess
+                        ? Icons.check_circle_rounded
+                        : Icons.error_rounded,
+                    color: isSuccess ? primaryColor : const Color(0xFFE53935),
+                    size: 38,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Judul Pop-up
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Pesan Deskripsi
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Tombol Kapsul Sesuai Referensi UI
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (isSuccess && onSuccessPressed != null) {
+                        onSuccessPressed();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isSuccess
+                          ? primaryColor
+                          : const Color(0xFFE53935),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    child: Text(
+                      isSuccess ? 'Lanjut Masuk' : 'Coba Lagi',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String _hashPassword(String password) {
     var bytes = utf8.encode(password);
     return sha256.convert(bytes).toString();
@@ -36,25 +154,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email.isEmpty ||
         password.isEmpty ||
         confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Semua bidang wajib diisi!',
-            style: GoogleFonts.poppins(),
-          ),
-        ),
+      _showCustomDialog(
+        title: 'Pendaftaran Gagal',
+        message: 'Semua bidang form wajib diisi!',
+        isSuccess: false,
       );
       return;
     }
 
     if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Konfirmasi password tidak cocok!',
-            style: GoogleFonts.poppins(),
-          ),
-        ),
+      _showCustomDialog(
+        title: 'Password Tidak Cocok',
+        message: 'Konfirmasi password yang kamu masukkan tidak sama.',
+        isSuccess: false,
       );
       return;
     }
@@ -62,25 +174,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     String hashedPassword = _hashPassword(password);
     debugPrint("User Registered: $name | $email | Hash: $hashedPassword");
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Pendaftaran berhasil! Silakan masuk.',
-          style: GoogleFonts.poppins(),
-        ),
-      ),
+    _showCustomDialog(
+      title: 'Pendaftaran Berhasil!',
+      message:
+          'Akun kamu telah berhasil dibuat. Silakan masuk untuk melanjutkan.',
+      isSuccess: true,
+      onSuccessPressed: () {
+        Navigator.pop(context);
+      },
     );
-
-    Navigator.pop(context);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
   }
 
   @override
@@ -263,7 +365,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String label,
     required IconData icon,
     bool isPassword = false,
-    bool isObscure = true, // Mengamankan nilai default agar tidak null
+    bool isObscure = true,
     VoidCallback? onToggleObscure,
     TextInputType keyboardType = TextInputType.text,
   }) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'home_screen.dart'; // Import HomeScreen kamu
+import 'home_screen.dart';
+import '../features/chatbot.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -12,12 +13,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
 
-  // 1. TAMBAHKAN Halaman ke-4 di List _pages ini
   final List<Widget> _pages = const [
-    HomeScreen(), // Tab 0: Beranda
-    Center(child: Text('Tiket Saya')), // Tab 1: Tiket Saya
-    Center(child: Text('Asisten AI')), // Tab 2: Asisten AI
-    Center(child: Text('Profil')), // Tab 3: Profil
+    HomeScreen(),
+    Center(child: Text('Tiket Saya')),
+    PlaceholderChatbotScreen(),
+    Center(child: Text('Profil')),
   ];
 
   @override
@@ -30,11 +30,8 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _index,
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey,
-        // Properti ini penting agar 4 item tampil rapi & berlabel jelas
         type: BottomNavigationBarType.fixed,
         onTap: (i) => setState(() => _index = i),
-
-        // 2. TAMBAHKAN Item ke-4 di List items ini
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_rounded),
@@ -45,7 +42,7 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Tiket Saya',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.smart_toy_rounded), // Ikon Robot / AI
+            icon: Icon(Icons.smart_toy_rounded),
             label: 'Asisten AI',
           ),
           BottomNavigationBarItem(

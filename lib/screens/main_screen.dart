@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'home_screen.dart';
 import '../features/chatbot.dart';
+import '../models/pesanan_model.dart';
+import 'eticket_screen.dart';
+import 'home_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -13,12 +15,42 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
 
-  final List<Widget> _pages = const [
-    HomeScreen(),
-    Center(child: Text('Tiket Saya')),
-    PlaceholderChatbotScreen(),
-    Center(child: Text('Profil')),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      // Tab 0: Beranda
+      const HomeScreen(),
+
+      // Tab 1: Tiket Saya (Terhubung ke ETicketScreen)
+      ETicketScreen(
+        pesanan: PesananModel(
+          userId: 'user_demo',
+          wisataId: 1,
+          namaWisata: 'Candi Prambanan',
+          tanggalKunjungan: '20/10/2026',
+          jumlahTiket: 2,
+          totalHarga: 100000,
+          mataUang: 'IDR',
+          metodePembayaran: 'QRIS',
+          qrCode: 'TIC-DEMO-12345',
+        ),
+      ),
+
+      // Tab 2: Asisten AI
+      const PlaceholderChatbotScreen(),
+
+      // Tab 3: Profil (Bisa diganti jika profil_screen.dart sudah ada)
+      const Center(
+        child: Text(
+          'Halaman Profil',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

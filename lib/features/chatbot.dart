@@ -1,133 +1,193 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class PlaceholderChatbotScreen extends StatefulWidget {
-  const PlaceholderChatbotScreen({super.key});
+class ChatbotScreen extends StatefulWidget {
+  const ChatbotScreen({super.key});
 
   @override
-  State<PlaceholderChatbotScreen> createState() => _ChatbotScreenState();
+  State<ChatbotScreen> createState() => _ChatbotScreenState();
 }
 
-class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
+class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // Lokasi Simulasi User
+  // 1. MASUKKAN GEMINI API KEY KAMU DI SINI
+  static const String _geminiApiKey = 'AQ.Ab8RN6L7-On8MzQZBe9NGV392OKuCNmINHmfLabwd4yPSzUCtg';
+
+  late final GenerativeModel _model;
+  late final ChatSession _chat;
+  bool _isLoading = false;
+
+  // GPS User Location (Default: Malioboro)
+  double _userLat = -7.7926;
+  double _userLng = 110.3658;
   String _currentLocationName = 'Malioboro, Yogyakarta';
 
-  // Sample Dataset Wisata Alam dari CSV
-  final List<Map<String, dynamic>> _sampleWisataAlam = [
-    {
-      'nama': 'Taman Tempuran Cikal',
-      'kategori': 'Alam',
-      'rating': 4.4,
-      'harga': 'Rp 5.000',
-      'jarak': '6.5 km',
-      'foto_url':
-          'https://res.cloudinary.com/dfciqrwpe/image/upload/v1749301634/Taman_Tempuran_Cikal_y9ongb.jpg',
-      'deskripsi':
-          'Taman alam di Piyungan dengan wahana kano, speed boat, & area outbound di pertemuan dua sungai.',
-    },
-    {
-      'nama': 'Selopamioro Adventure Park',
-      'kategori': 'Alam',
-      'rating': 4.5,
-      'harga': 'Rp 30.000',
-      'jarak': '18.2 km',
-      'foto_url':
-          'https://res.cloudinary.com/dfciqrwpe/image/upload/v1749368364/selopamioro-adventure_qhctxz.jpg',
-      'deskripsi':
-          'Aktivitas outbound & permainan air di tepi sungai Imogiri yang memanjakan pengunjung.',
-    },
-    {
-      'nama': 'Tebing Gunung Gajah',
-      'kategori': 'Alam',
-      'rating': 4.5,
-      'harga': 'Rp 5.000',
-      'jarak': '25.0 km',
-      'foto_url':
-          'https://res.cloudinary.com/dfciqrwpe/image/upload/v1748937502/Tebing-Gunung-Gajah_wuodco.jpg',
-      'deskripsi':
-          'Spot foto perbukitan Menoreh yang hijau dengan pemandangan Waduk Sermo di tengahnya.',
-    },
-  ];
-
-  // Sample Data Pantai
-  final Map<String, dynamic> _samplePantai = {
-    'nama': 'Pantai Indrayanti',
-    'kategori': 'Pantai',
-    'rating': 4.6,
-    'harga': 'Rp 10.000',
-    'jarak': '45.0 km',
-    'foto_url':
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500',
-    'deskripsi': 'Pantai pasir putih bersih dengan restoran & gazebo di tepi laut Gunungkidul.',
-  };
-
-  // List Chat Messages
   final List<Map<String, dynamic>> _messages = [
     {
       'isUser': false,
       'text':
-          'Halo! Aku Asisten AI LelunganJogja. Mau cari rekomendasi wisata terdekat atau sesuai kategori favoritmu?',
+          'Halo! Aku Asisten AI LelunganJogja. Aku bisa memberikan rekomendasi wisata terdekat dari lokasi GPS kamu secara realtime!',
       'cards': <Map<String, dynamic>>[],
       'time': '10:00',
     }
   ];
 
-  void _sendMessage(String text) {
-    if (text.trim().isEmpty) return;
+  @override
+  void initState() {
+    super.initState();
+    _initGemini();
+    _initUserGps();
+  }
+
+  void _initGemini() {
+    _model = GenerativeModel(
+      model: 'gemini-1.5-flash',
+      apiKey: _geminiApiKey,
+      systemInstruction: Content.system(
+        'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '
+        'Jawablah pertanyaan pengguna berdasarkan rekomendasi data tempat wisata Jogja secara singkat, jelas, dan informatif tanpa emoji berlebihan.',
+      ),
+    );
+    _chat = _model.startChat();
+  }
+
+  Future<void> _initUserGps() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always) {
+          Position pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+          setState(() {
+            _userLat = pos.latitude;
+            _userLng = pos.longitude;
+            _currentLocationName = 'Lokasi GPS Anda';
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a = 0.5 -
+        c((lat2 - lat1) * p) / 2 +
+        c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a));
+  }
+
+  // Fetch dari Supabase berdasarkan Kategori / Terdekat
+  Future<List<Map<String, dynamic>>> _getWisataFromSupabase(String query) async {
+    try {
+      String lowerQuery = query.toLowerCase();
+      var dbQuery = Supabase.instance.client.from('wisata').select();
+
+      if (lowerQuery.contains('pantai')) {
+        dbQuery = dbQuery.ilike('kategori', '%pantai%');
+      } else if (lowerQuery.contains('alam')) {
+        dbQuery = dbQuery.ilike('kategori', '%alam%');
+      } else if (lowerQuery.contains('budaya') || lowerQuery.contains('sejarah')) {
+        dbQuery = dbQuery.ilike('kategori', '%budaya%');
+      }
+
+      final List<dynamic> data = await dbQuery;
+
+      List<Map<String, dynamic>> results = data.map((item) {
+        double itemLat = (item['latitude'] as num).toDouble();
+        double itemLng = (item['longitude'] as num).toDouble();
+        double distance = _calculateDistance(_userLat, _userLng, itemLat, itemLng);
+
+        return {
+          'nama': item['nama'] ?? '',
+          'kategori': item['kategori'] ?? '',
+          'rating': (item['rating'] as num?)?.toDouble() ?? 4.5,
+          'harga': 'Rp ${item['harga_weekday'] ?? 0}',
+          'jarak': '${distance.toStringAsFixed(1)} km',
+          'jarak_num': distance,
+          'foto_url': item['foto_url'] ?? '',
+          'deskripsi': item['deskripsi'] ?? '',
+        };
+      }).toList();
+
+      results.sort((a, b) => (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
+      return results.take(4).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> _sendMessage(String text) async {
+    if (text.trim().isEmpty || _isLoading) return;
+
+    final userText = text.trim();
+    _messageController.clear();
 
     setState(() {
       _messages.add({
         'isUser': true,
-        'text': text,
+        'text': userText,
         'cards': <Map<String, dynamic>>[],
         'time': _getCurrentTime(),
       });
+      _isLoading = true;
     });
 
-    _messageController.clear();
     _scrollToBottom();
 
-    // Simulasi respon AI
-    Future.delayed(const Duration(milliseconds: 600), () {
-      _generateAiResponse(text);
-    });
-  }
+    // 1. Ambil data wisata nyata dari Supabase
+    List<Map<String, dynamic>> matchedCards = await _getWisataFromSupabase(userText);
 
-  void _generateAiResponse(String query) {
-    String lowerQuery = query.toLowerCase();
-    String responseText = '';
-    List<Map<String, dynamic>> matchedCards = [];
+    try {
+      // 2. Buat Prompt untuk Gemini dengan Data Supabase + GPS
+      String prompt = '''
+Posisi GPS Pengguna: Latitude $_userLat, Longitude $_userLng.
+Data Tempat Wisata dari Supabase Database:
+${matchedCards.map((w) => "- ${w['nama']} (Kategori: ${w['kategori']}, Jarak: ${w['jarak']}, Tiket: ${w['harga']}, Rating: ${w['rating']})").join('\n')}
 
-    if (lowerQuery.contains('pantai')) {
-      responseText =
-          'Berikut rekomendasi pantai pasir putih populer di Jogja untuk Anda:';
-      matchedCards = [_samplePantai];
-    } else if (lowerQuery.contains('lokasi') || lowerQuery.contains('terdekat')) {
-      responseText =
-          'Berdasarkan lokasimu di $_currentLocationName, berikut rekomendasi wisata terdekat:';
-      matchedCards = [_sampleWisataAlam[0], _sampleWisataAlam[1]];
-    } else if (lowerQuery.contains('alam')) {
-      responseText =
-          'Berikut rekomendasi wisata alam sejuk dan hits di Jogja:';
-      matchedCards = _sampleWisataAlam;
-    } else {
-      responseText =
-          'Kamu bisa memilih atau mengetik kategori wisata seperti Wisata Alam, Pantai, atau Wisata Terdekat.';
-    }
+Pertanyaan Pengguna: "$userText"
+Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat dari data di atas.
+''';
 
-    setState(() {
-      _messages.add({
-        'isUser': false,
-        'text': responseText,
-        'cards': matchedCards,
-        'time': _getCurrentTime(),
+      final response = await _chat.sendMessage(Content.text(prompt));
+
+      setState(() {
+        _messages.add({
+          'isUser': false,
+          'text': response.text ?? 'Berikut rekomendasi wisata untuk Anda:',
+          'cards': matchedCards,
+          'time': _getCurrentTime(),
+        });
       });
-    });
-
-    _scrollToBottom();
+    } catch (e) {
+      setState(() {
+        _messages.add({
+          'isUser': false,
+          'text': matchedCards.isNotEmpty
+              ? 'Berikut beberapa tempat wisata terdekat dari lokasimu:'
+              : 'Maaf, gagal memproses rekomendasi saat ini. Pastikan koneksi internet aktif.',
+          'cards': matchedCards,
+          'time': _getCurrentTime(),
+        });
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+      _scrollToBottom();
+    }
   }
 
   String _getCurrentTime() {
@@ -147,52 +207,6 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
     });
   }
 
-  void _changeLocationDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return SimpleDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Atur Lokasi Anda',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          children: [
-            _buildLocationOption('Malioboro, Yogyakarta'),
-            _buildLocationOption('Tugu Jogja, Sleman'),
-            _buildLocationOption('Imogiri, Bantul'),
-            _buildLocationOption('Wonosari, Gunungkidul'),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildLocationOption(String locationName) {
-    return SimpleDialogOption(
-      onPressed: () {
-        setState(() {
-          _currentLocationName = locationName;
-        });
-        Navigator.pop(context);
-        _sendMessage('Sekarang saya di $locationName, rekomendasi wisata terdekat dong');
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on, color: Color(0xFF1550B6), size: 20),
-            const SizedBox(width: 10),
-            Text(
-              locationName,
-              style: GoogleFonts.poppins(fontSize: 14),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
@@ -210,33 +224,33 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
                 fontSize: 16,
               ),
             ),
-            InkWell(
-              onTap: _changeLocationDialog,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.location_on, size: 12, color: Colors.white70),
-                  const SizedBox(width: 4),
-                  Text(
-                    _currentLocationName,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: Colors.white70,
-                      decoration: TextDecoration.underline,
-                    ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.location_on, size: 12, color: Colors.white70),
+                const SizedBox(width: 4),
+                Text(
+                  _currentLocationName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: Colors.white70,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
         backgroundColor: primaryColor,
         elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Column(
         children: [
-          // List Chat
+          // List Messages
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -275,7 +289,6 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Teks Pesan
                         Text(
                           msg['text'],
                           style: GoogleFonts.poppins(
@@ -285,11 +298,11 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
                           ),
                         ),
 
-                        // Card Carousel Gambar Wisata
+                        // Card Carousel Gambar
                         if (cards.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           SizedBox(
-                            height: 200,
+                            height: 195,
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
                               itemCount: cards.length,
@@ -314,13 +327,13 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
                                         ),
                                         child: Image.network(
                                           item['foto_url'],
-                                          height: 100,
+                                          height: 95,
                                           width: double.infinity,
                                           fit: BoxFit.cover,
                                           errorBuilder:
                                               (context, error, stackTrace) =>
                                                   Container(
-                                            height: 100,
+                                            height: 95,
                                             color: Colors.grey.shade300,
                                             child: const Icon(
                                               Icons.landscape,
@@ -410,7 +423,16 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
             ),
           ),
 
-          // Quick Suggestion Chips
+          if (_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6.0),
+              child: Text(
+                'Gemini AI sedang mengambil data Supabase & berpikir...',
+                style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ),
+
+          // Quick Chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -419,23 +441,17 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
                 _buildQuickChip(
                   icon: Icons.near_me_outlined,
                   label: 'Wisata Terdekat',
-                  onTap: () {
-                    _sendMessage('Rekomendasi wisata terdekat dari lokasiku dong');
-                  },
+                  onTap: () => _sendMessage('Rekomendasi wisata terdekat dari lokasiku dong'),
                 ),
                 _buildQuickChip(
                   icon: Icons.park_outlined,
                   label: 'Wisata Alam',
-                  onTap: () {
-                    _sendMessage('Cari wisata alam di Jogja');
-                  },
+                  onTap: () => _sendMessage('Cari wisata alam terbaik di Jogja'),
                 ),
                 _buildQuickChip(
                   icon: Icons.beach_access_outlined,
                   label: 'Pantai',
-                  onTap: () {
-                    _sendMessage('Rekomendasi pantai indah di Jogja');
-                  },
+                  onTap: () => _sendMessage('Rekomendasi pantai indah di Jogja'),
                 ),
               ],
             ),
@@ -453,7 +469,7 @@ class _ChatbotScreenState extends State<PlaceholderChatbotScreen> {
                       controller: _messageController,
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'Tanya wisata atau ketik lokasi...',
+                        hintText: 'Tanya Gemini AI tentang wisata...',
                         hintStyle: GoogleFonts.poppins(
                             fontSize: 13, color: Colors.grey.shade400),
                         filled: true,

@@ -10,8 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  google_fonts: ^6.1.0 # Tambahkan ini untuk font Poppins
-  supabase_flutter: ^2.8.0
+  google_fonts: ^6.1.0 # Font Poppins
+  supabase_flutter: ^2.8.0 # Supabase Database & Auth
 
   # Icon bawaan Flutter
   cupertino_icons: ^1.0.8
@@ -23,6 +23,10 @@ dependencies:
   # Paket Peta LBS (OpenStreetMap - Web/Map API)
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
+
+  # Sensor GPS Device & AI Chatbot Gemini:
+  geolocator: ^10.1.0 # Sensor GPS Device Native
+  google_generative_ai: ^0.4.0 # Gemini API
 
 dev_dependencies:
   flutter_test:

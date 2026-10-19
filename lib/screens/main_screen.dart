@@ -4,6 +4,7 @@ import '../features/chatbot.dart';
 import '../models/pesanan_model.dart';
 import 'eticket_screen.dart';
 import 'home_screen.dart';
+import 'profil_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -40,15 +41,10 @@ class _MainScreenState extends State<MainScreen> {
       ),
 
       // Tab 2: Asisten AI
-      const PlaceholderChatbotScreen(),
+      const ChatbotScreen(),
 
-      // Tab 3: Profil (Bisa diganti jika profil_screen.dart sudah ada)
-      const Center(
-        child: Text(
-          'Halaman Profil',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      ),
+      // Tab 3: Profil
+      const PlaceholderProfilScreen(),
     ];
   }
 

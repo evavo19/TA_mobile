@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../features/feedback.dart';
 import '../features/game.dart';
 import '../services/gps_service.dart';
+import '../auth/login_screen.dart';
 
 class PlaceholderProfilScreen extends StatefulWidget {
   const PlaceholderProfilScreen({super.key});
@@ -402,16 +403,56 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     subtitle: 'Kelola akses masuk akun',
                     onTap: () {},
                   ),
-                  _buildMenuItem(
-                    icon: Icons.logout,
-                    title: 'Keluar',
-                    subtitle: 'Keluar dari akun LelunganJogja',
-                    textColor: Colors.redAccent,
-                    iconColor: Colors.redAccent,
-                    onTap: () {
-                      Navigator.pushReplacementNamed(context, '/login');
-                    },
-                  ),
+               _buildMenuItem(
+  icon: Icons.logout,
+  title: 'Keluar',
+  subtitle: 'Keluar dari akun LelunganJogja',
+  textColor: Colors.redAccent,
+  iconColor: Colors.redAccent,
+  onTap: () {
+    // 1. Tampilkan pop-up konfirmasi keluar
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Keluar Akun',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Apakah kamu yakin ingin keluar dari LelunganJogja?',
+          style: GoogleFonts.poppins(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Tutup dialog
+              
+              // Arahkan ke halaman login dan hapus riwayat halaman sebelumnya
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text('Keluar', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  },
+),
                   const SizedBox(height: 24),
                 ],
               ),

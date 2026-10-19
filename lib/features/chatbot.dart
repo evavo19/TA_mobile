@@ -6,6 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Import model dan screen detail wisata
+import '../models/wisata_model.dart';
+import '../screens/detail_wisata_screen.dart';
+
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
 
@@ -17,9 +21,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // Load API Key dari file .env secara aman
-  static final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-
+  late final String _geminiApiKey;
   late final GenerativeModel _model;
   late final ChatSession _chat;
   bool _isLoading = false;
@@ -47,6 +49,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   void _initGemini() {
+    _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
       apiKey: _geminiApiKey,
@@ -122,7 +125,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       }
 
       if (maxBudget != null) {
-        dbQuery = dbQuery.lte('harga_weekday', maxBudget);
+        if (maxBudget > 0) {
+          // Jika user menyebutkan angka budget (>0), filter harga Rp 1.000 s/d maxBudget
+          dbQuery = dbQuery
+              .gte('harga_weekday', 1000)
+              .lte('harga_weekday', maxBudget);
+        } else {
+          // Jika user spesifik mencari yang "gratis", ambil harga_weekday = 0
+          dbQuery = dbQuery.eq('harga_weekday', 0);
+        }
       }
 
       // 2. PARSING LOKASI DAERAH
@@ -153,22 +164,18 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       final List<dynamic> data = await dbQuery;
 
       List<Map<String, dynamic>> results = data.map((item) {
-        double itemLat = (item['latitude'] as num).toDouble();
-        double itemLng = (item['longitude'] as num).toDouble();
+        double itemLat = (item['latitude'] as num?)?.toDouble() ?? 0.0;
+        double itemLng = (item['longitude'] as num?)?.toDouble() ?? 0.0;
         double distance =
             _calculateDistance(_userLat, _userLng, itemLat, itemLng);
 
-        return {
-          'nama': item['nama'] ?? '',
-          'kategori': item['kategori'] ?? '',
-          'rating': (item['rating'] as num?)?.toDouble() ?? 4.5,
-          'harga_num': item['harga_weekday'] ?? 0,
-          'harga': 'Rp ${item['harga_weekday'] ?? 0}',
-          'jarak': '${distance.toStringAsFixed(1)} km',
-          'jarak_num': distance,
-          'foto_url': item['foto_url'] ?? '',
-          'deskripsi': item['deskripsi'] ?? '',
-        };
+        Map<String, dynamic> rawItem = Map<String, dynamic>.from(item);
+
+        rawItem['jarak'] = '${distance.toStringAsFixed(1)} km';
+        rawItem['jarak_num'] = distance;
+        rawItem['harga'] = 'Rp ${item['harga_weekday'] ?? 0}';
+
+        return rawItem;
       }).toList();
 
       // 4. PARSING "JALAN KAKI" / DESTINASI SANGAT DEKAT (<= 1.5 KM)
@@ -185,10 +192,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       }
 
       // 5. URUTKAN HASIL
-      if (maxBudget != null) {
-        results.sort((a, b) =>
-            (a['harga_num'] as int).compareTo(b['harga_num'] as int));
+      if (maxBudget != null && maxBudget > 0) {
+        // Urutkan dari harga tertinggi mendekati budget pengguna
+        results.sort((a, b) => ((b['harga_weekday'] ?? 0) as int)
+            .compareTo((a['harga_weekday'] ?? 0) as int));
       } else {
+        // Urutkan berdasarkan jarak terdekat
         results.sort((a, b) =>
             (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
       }
@@ -290,39 +299,39 @@ Instruksi untuk AI:
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
-        title: Column(
-          children: [
-            Text(
-              'Asisten AI Wisata',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontSize: 16,
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.location_on, size: 12, color: Colors.white70),
-                const SizedBox(width: 4),
-                Text(
-                  _currentLocationName,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: Colors.white70,
-                  ),
+        automaticallyImplyLeading: false, // Tanpa panah back
+        title: Align(
+          alignment: Alignment.centerLeft, // Teks rata kiri
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Asisten AI Wisata',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 16,
                 ),
-              ],
-            ),
-          ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.location_on, size: 11, color: Colors.white70),
+                  const SizedBox(width: 4),
+                  Text(
+                    _currentLocationName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         backgroundColor: primaryColor,
         elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: Column(
         children: [
@@ -385,96 +394,115 @@ Instruksi untuk AI:
                               itemCount: cards.length,
                               itemBuilder: (context, cardIndex) {
                                 final item = cards[cardIndex];
-                                return Container(
-                                  width: 200,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF6F8FB),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: const BorderRadius.vertical(
-                                          top: Radius.circular(12),
+                                return GestureDetector(
+                                  onTap: () {
+                                    // Konversi Map ke WisataModel
+                                    final wisataModel = WisataModel.fromMap(item);
+
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DetailWisataScreen(
+                                          wisata: wisataModel,
                                         ),
-                                        child: Image.network(
-                                          item['foto_url'],
-                                          height: 95,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) =>
-                                                  Container(
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 200,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF6F8FB),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.grey.shade200,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                            top: Radius.circular(12),
+                                          ),
+                                          child: Image.network(
+                                            item['foto_url'] ?? '',
                                             height: 95,
-                                            color: Colors.grey.shade300,
-                                            child: const Icon(
-                                              Icons.landscape,
-                                              color: Colors.grey,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error,
+                                                    stackTrace) =>
+                                                Container(
+                                              height: 95,
+                                              color: Colors.grey.shade300,
+                                              child: const Icon(
+                                                Icons.landscape,
+                                                color: Colors.grey,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              item['nama'],
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: GoogleFonts.poppins(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
-                                                color: Colors.black87,
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item['nama'] ?? '',
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                  color: Colors.black87,
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.star,
-                                                  size: 14,
-                                                  color: Colors.amber,
-                                                ),
-                                                const SizedBox(width: 2),
-                                                Text(
-                                                  '${item['rating']}',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.star,
+                                                    size: 14,
+                                                    color: Colors.amber,
                                                   ),
-                                                ),
-                                                const Spacer(),
-                                                Text(
-                                                  item['harga'],
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: primaryColor,
+                                                  const SizedBox(width: 2),
+                                                  Text(
+                                                    '${item['rating'] ?? 4.5}',
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Jarak: ${item['jarak']}',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 10,
-                                                color: Colors.grey.shade600,
+                                                  const Spacer(),
+                                                  Text(
+                                                    item['harga'] ?? 'Rp 0',
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: primaryColor,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Jarak: ${item['jarak'] ?? '0.0 km'}',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 10,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 );
                               },
@@ -520,20 +548,20 @@ Instruksi untuk AI:
                 _buildQuickChip(
                   icon: Icons.directions_walk,
                   label: 'Bisa Jalan Kaki',
-                  onTap: () =>
-                      _sendMessage('Rekomendasi wisata yang bisa ditempuh jalan kaki'),
+                  onTap: () => _sendMessage(
+                      'Rekomendasi wisata yang bisa ditempuh jalan kaki'),
                 ),
                 _buildQuickChip(
                   icon: Icons.attach_money,
-                  label: 'Wisata Rp 5.000',
+                  label: 'Wisata Rp 20.000',
                   onTap: () =>
-                      _sendMessage('Rekomendasi wisata dengan tiket 5000 dong'),
+                      _sendMessage('Rekomendasi wisata dengan tiket 20000 dong'),
                 ),
                 _buildQuickChip(
                   icon: Icons.near_me_outlined,
                   label: 'Wisata Terdekat',
-                  onTap: () =>
-                      _sendMessage('Rekomendasi wisata terdekat dari lokasiku'),
+                  onTap: () => _sendMessage(
+                      'Rekomendasi wisata terdekat dari lokasiku'),
                 ),
               ],
             ),
@@ -551,7 +579,8 @@ Instruksi untuk AI:
                       controller: _messageController,
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'Tanya budget, jalan kaki, wisata terdekat...',
+                        hintText:
+                            'Tanya budget, jalan kaki, wisata terdekat...',
                         hintStyle: GoogleFonts.poppins(
                             fontSize: 13, color: Colors.grey.shade400),
                         filled: true,
@@ -571,8 +600,8 @@ Instruksi untuk AI:
                     backgroundColor: primaryColor,
                     radius: 22,
                     child: IconButton(
-                      icon:
-                          const Icon(Icons.send, color: Colors.white, size: 18),
+                      icon: const Icon(Icons.send,
+                          color: Colors.white, size: 18),
                       onPressed: () => _sendMessage(_messageController.text),
                     ),
                   ),

@@ -39,6 +39,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Daftarkan file .env sebagai asset aplikasi
   assets:
     - .env
+    - assets/LelunganJogja.jpg
+    - assets/tugu.jpg
+    - assets/keraton.jpg
+    - assets/pemandangan.jpg

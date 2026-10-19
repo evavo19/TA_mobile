@@ -1,5 +1,5 @@
 name: pemesanan_tiket
-description: "Aplikasi Pemesanan Tiket Wisata Jogja bernama 'Lelungan Jogja' "
+description: "Aplikasi Pemesanan Tiket Wisata Jogja bernama 'Lelungan Jogja'"
 publish_to: "none"
 
 version: 1.0.0+1
@@ -24,10 +24,11 @@ dependencies:
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
 
-  # Sensor GPS Device & AI Chatbot Gemini:
+  # Sensor GPS Device, AI Chatbot Gemini, & Environment Variables:
   geolocator: ^10.1.0 # Sensor GPS Device Native
   google_generative_ai: ^0.4.0 # Gemini API
   url_launcher: ^6.2.5
+  flutter_dotenv: ^5.1.0 # Paket untuk membaca file .env
 
 dev_dependencies:
   flutter_test:
@@ -38,6 +39,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Jika nanti ingin menambahkan gambar lokal (assets), uncomment bagian di bawah ini:
-  # assets:
-  #   - assets/images/
+  # Daftarkan file .env sebagai asset aplikasi
+  assets:
+    - .env

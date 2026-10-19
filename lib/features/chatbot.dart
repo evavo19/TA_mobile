@@ -1,5 +1,6 @@
-/*import 'dart:math';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -16,8 +17,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // 1. MASUKKAN GEMINI API KEY KAMU DI SINI
- const apiKey = String.fromEnvironment('GEMINI_API_KEY');
+  // Load API Key dari file .env secara aman
+  static final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
   late final GenerativeModel _model;
   late final ChatSession _chat;
@@ -32,7 +33,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     {
       'isUser': false,
       'text':
-          'Halo! Aku Asisten AI LelunganJogja. Aku bisa memberikan rekomendasi wisata terdekat dari lokasi GPS kamu secara realtime!',
+          'Halo! Aku Asisten AI LelunganJogja. Mau cari rekomendasi wisata sesuai budget, lokasi terdekat, yang bisa dijalanin kaki, atau kategori favoritmu?',
       'cards': <Map<String, dynamic>>[],
       'time': '10:00',
     }
@@ -51,7 +52,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       apiKey: _geminiApiKey,
       systemInstruction: Content.system(
         'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '
-        'Jawablah pertanyaan pengguna berdasarkan rekomendasi data tempat wisata Jogja secara singkat, jelas, dan informatif tanpa emoji berlebihan.',
+        'Jawablah pertanyaan pengguna berdasarkan rekomendasi data tempat wisata Jogja yang diberikan secara singkat, jelas, ramah, dan informatif tanpa emoji berlebihan.',
       ),
     );
     _chat = _model.startChat();
@@ -80,7 +81,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     } catch (_) {}
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     var p = 0.017453292519943295;
     var c = cos;
     var a = 0.5 -
@@ -89,17 +91,62 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     return 12742 * asin(sqrt(a));
   }
 
-  // Fetch dari Supabase berdasarkan Kategori / Terdekat
-  Future<List<Map<String, dynamic>>> _getWisataFromSupabase(String query) async {
+  // Parser Budget, Jalan Kaki, & Filter Dinamis Supabase
+  Future<List<Map<String, dynamic>>> _getWisataFromSupabase(
+      String query) async {
     try {
       String lowerQuery = query.toLowerCase();
       var dbQuery = Supabase.instance.client.from('wisata').select();
 
+      // 1. PARSING HARGA / BUDGET DARI TEKS USER
+      int? maxBudget;
+      final RegExp regExpAngka = RegExp(r'(\d+[\.\d]*)\s*(rb|ribu)?');
+      final match = regExpAngka.firstMatch(lowerQuery);
+
+      if (match != null) {
+        String angkaStr = match.group(1)!.replaceAll('.', '');
+        int baseVal = int.tryParse(angkaStr) ?? 0;
+        bool hasRb = match.group(2) != null;
+
+        if (hasRb) {
+          maxBudget = baseVal * 1000;
+        } else if (baseVal < 1000 && baseVal > 0) {
+          maxBudget = baseVal * 1000;
+        } else {
+          maxBudget = baseVal;
+        }
+      } else if (lowerQuery.contains('gratis')) {
+        maxBudget = 0;
+      } else if (lowerQuery.contains('murah')) {
+        maxBudget = 10000;
+      }
+
+      if (maxBudget != null) {
+        dbQuery = dbQuery.lte('harga_weekday', maxBudget);
+      }
+
+      // 2. PARSING LOKASI DAERAH
+      if (lowerQuery.contains('bantul') ||
+          lowerQuery.contains('imogiri') ||
+          lowerQuery.contains('piyungan')) {
+        dbQuery = dbQuery.ilike('deskripsi', '%bantul%');
+      } else if (lowerQuery.contains('sleman') ||
+          lowerQuery.contains('kaliurang')) {
+        dbQuery = dbQuery.ilike('deskripsi', '%sleman%');
+      } else if (lowerQuery.contains('gunungkidul') ||
+          lowerQuery.contains('wonosari')) {
+        dbQuery = dbQuery.ilike('deskripsi', '%gunungkidul%');
+      }
+
+      // 3. PARSING KATEGORI
       if (lowerQuery.contains('pantai')) {
         dbQuery = dbQuery.ilike('kategori', '%pantai%');
       } else if (lowerQuery.contains('alam')) {
         dbQuery = dbQuery.ilike('kategori', '%alam%');
-      } else if (lowerQuery.contains('budaya') || lowerQuery.contains('sejarah')) {
+      } else if (lowerQuery.contains('budaya') ||
+          lowerQuery.contains('sejarah') ||
+          lowerQuery.contains('candi') ||
+          lowerQuery.contains('museum')) {
         dbQuery = dbQuery.ilike('kategori', '%budaya%');
       }
 
@@ -108,12 +155,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       List<Map<String, dynamic>> results = data.map((item) {
         double itemLat = (item['latitude'] as num).toDouble();
         double itemLng = (item['longitude'] as num).toDouble();
-        double distance = _calculateDistance(_userLat, _userLng, itemLat, itemLng);
+        double distance =
+            _calculateDistance(_userLat, _userLng, itemLat, itemLng);
 
         return {
           'nama': item['nama'] ?? '',
           'kategori': item['kategori'] ?? '',
           'rating': (item['rating'] as num?)?.toDouble() ?? 4.5,
+          'harga_num': item['harga_weekday'] ?? 0,
           'harga': 'Rp ${item['harga_weekday'] ?? 0}',
           'jarak': '${distance.toStringAsFixed(1)} km',
           'jarak_num': distance,
@@ -122,7 +171,28 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         };
       }).toList();
 
-      results.sort((a, b) => (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
+      // 4. PARSING "JALAN KAKI" / DESTINASI SANGAT DEKAT (<= 1.5 KM)
+      bool isWalk = lowerQuery.contains('jalan kaki') ||
+          lowerQuery.contains('ditempuh jalan') ||
+          lowerQuery.contains('jalan aja') ||
+          lowerQuery.contains('jalan santai') ||
+          lowerQuery.contains('dekat banget');
+
+      if (isWalk) {
+        results = results
+            .where((item) => (item['jarak_num'] as double) <= 1.5)
+            .toList();
+      }
+
+      // 5. URUTKAN HASIL
+      if (maxBudget != null) {
+        results.sort((a, b) =>
+            (a['harga_num'] as int).compareTo(b['harga_num'] as int));
+      } else {
+        results.sort((a, b) =>
+            (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
+      }
+
       return results.take(4).toList();
     } catch (e) {
       return [];
@@ -147,18 +217,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     _scrollToBottom();
 
-    // 1. Ambil data wisata nyata dari Supabase
-    List<Map<String, dynamic>> matchedCards = await _getWisataFromSupabase(userText);
+    // 1. Ambil data wisata terpilih dari Supabase
+    List<Map<String, dynamic>> matchedCards =
+        await _getWisataFromSupabase(userText);
 
     try {
-      // 2. Buat Prompt untuk Gemini dengan Data Supabase + GPS
+      // 2. Buat Context Prompt untuk Gemini AI
       String prompt = '''
-Posisi GPS Pengguna: Latitude $_userLat, Longitude $_userLng.
-Data Tempat Wisata dari Supabase Database:
-${matchedCards.map((w) => "- ${w['nama']} (Kategori: ${w['kategori']}, Jarak: ${w['jarak']}, Tiket: ${w['harga']}, Rating: ${w['rating']})").join('\n')}
-
+Posisi GPS Pengguna saat ini: Latitude $_userLat, Longitude $_userLng.
 Pertanyaan Pengguna: "$userText"
-Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat dari data di atas.
+
+Berikut adalah daftar tempat wisata dari Database Supabase yang SESUAI dengan kriteria/budget/jarak pengguna:
+${matchedCards.isEmpty ? "Tidak ditemukan tempat wisata yang sesuai persis dengan kriteria tersebut." : matchedCards.map((w) => "- ${w['nama']} (Kategori: ${w['kategori']}, Jarak: ${w['jarak']}, Harga Tiket: ${w['harga']}, Rating: ${w['rating']})").join('\n')}
+
+Instruksi untuk AI:
+- Jawablah pertanyaan pengguna secara ramah dan natural.
+- Jika ada hasil wisata di atas, rekomendasikan nama tempat tersebut beserta info jarak/harganya.
+- Jika tidak ada hasil yang sesuai, jawab dengan sopan bahwa belum ada tempat wisata yang cocok di database.
 ''';
 
       final response = await _chat.sendMessage(Content.text(prompt));
@@ -166,7 +241,8 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
       setState(() {
         _messages.add({
           'isUser': false,
-          'text': response.text ?? 'Berikut rekomendasi wisata untuk Anda:',
+          'text': response.text ??
+              'Berikut rekomendasi tempat wisata yang sesuai untuk Anda:',
           'cards': matchedCards,
           'time': _getCurrentTime(),
         });
@@ -176,8 +252,8 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
         _messages.add({
           'isUser': false,
           'text': matchedCards.isNotEmpty
-              ? 'Berikut beberapa tempat wisata terdekat dari lokasimu:'
-              : 'Maaf, gagal memproses rekomendasi saat ini. Pastikan koneksi internet aktif.',
+              ? 'Berikut rekomendasi destinasi yang sesuai dengan pencarianmu:'
+              : 'Maaf, terjadi masalah saat memproses permintaan. Pastikan koneksi internet aktif.',
           'cards': matchedCards,
           'time': _getCurrentTime(),
         });
@@ -263,7 +339,8 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
                     List<Map<String, dynamic>>.from(msg['cards'] ?? []);
 
                 return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(14),
@@ -319,7 +396,8 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
                                     ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       ClipRRect(
                                         borderRadius: const BorderRadius.vertical(
@@ -428,7 +506,8 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
               padding: const EdgeInsets.symmetric(vertical: 6.0),
               child: Text(
                 'Gemini AI sedang mengambil data Supabase & berpikir...',
-                style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: Colors.grey.shade600),
               ),
             ),
 
@@ -439,19 +518,22 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
             child: Row(
               children: [
                 _buildQuickChip(
+                  icon: Icons.directions_walk,
+                  label: 'Bisa Jalan Kaki',
+                  onTap: () =>
+                      _sendMessage('Rekomendasi wisata yang bisa ditempuh jalan kaki'),
+                ),
+                _buildQuickChip(
+                  icon: Icons.attach_money,
+                  label: 'Wisata Rp 5.000',
+                  onTap: () =>
+                      _sendMessage('Rekomendasi wisata dengan tiket 5000 dong'),
+                ),
+                _buildQuickChip(
                   icon: Icons.near_me_outlined,
                   label: 'Wisata Terdekat',
-                  onTap: () => _sendMessage('Rekomendasi wisata terdekat dari lokasiku dong'),
-                ),
-                _buildQuickChip(
-                  icon: Icons.park_outlined,
-                  label: 'Wisata Alam',
-                  onTap: () => _sendMessage('Cari wisata alam terbaik di Jogja'),
-                ),
-                _buildQuickChip(
-                  icon: Icons.beach_access_outlined,
-                  label: 'Pantai',
-                  onTap: () => _sendMessage('Rekomendasi pantai indah di Jogja'),
+                  onTap: () =>
+                      _sendMessage('Rekomendasi wisata terdekat dari lokasiku'),
                 ),
               ],
             ),
@@ -469,7 +551,7 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
                       controller: _messageController,
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'Tanya Gemini AI tentang wisata...',
+                        hintText: 'Tanya budget, jalan kaki, wisata terdekat...',
                         hintStyle: GoogleFonts.poppins(
                             fontSize: 13, color: Colors.grey.shade400),
                         filled: true,
@@ -489,7 +571,8 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
                     backgroundColor: primaryColor,
                     radius: 22,
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                      icon:
+                          const Icon(Icons.send, color: Colors.white, size: 18),
                       onPressed: () => _sendMessage(_messageController.text),
                     ),
                   ),
@@ -528,4 +611,4 @@ Tolong jawab pertanyaan pengguna secara ramah dan rekomendasikan tempat-tempat d
       ),
     );
   }
-}*/
+}

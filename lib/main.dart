@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 1. Tambahkan import ini
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/login_screen.dart';
@@ -6,6 +7,9 @@ import 'screens/main_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Load file .env sebelum app/Supabase dinyalakan
+  await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(
     url: 'https://lzpgyrrowgsyvkcuzara.supabase.co',

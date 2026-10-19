@@ -17,7 +17,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final ScrollController _scrollController = ScrollController();
 
   // 1. MASUKKAN GEMINI API KEY KAMU DI SINI
-  static const String _geminiApiKey = 'AQ.Ab8RN6L7-On8MzQZBe9NGV392OKuCNmINHmfLabwd4yPSzUCtg';
+ const apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   late final GenerativeModel _model;
   late final ChatSession _chat;

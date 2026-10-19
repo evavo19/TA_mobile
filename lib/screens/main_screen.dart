@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../features/chatbot.dart';
+//import '../features/chatbot.dart';
 import '../models/pesanan_model.dart';
 import 'eticket_screen.dart';
 import 'home_screen.dart';
@@ -41,7 +41,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
 
       // Tab 2: Asisten AI
-      const ChatbotScreen(),
+      // const ChatbotScreen(),
 
       // Tab 3: Profil
       const PlaceholderProfilScreen(),

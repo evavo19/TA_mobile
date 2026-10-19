@@ -113,9 +113,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Colors.black.withOpacity(0.4),
+                              Colors.black.withValues(alpha:0.4),
                               Colors.transparent,
-                              Colors.black.withOpacity(0.2),
+                              Colors.black.withValues(alpha:0.2),
                             ],
                           ),
                         ),
@@ -126,7 +126,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                       top: 48,
                       left: 16,
                       child: CircleAvatar(
-                        backgroundColor: Colors.black.withOpacity(0.4),
+                        backgroundColor: Colors.black.withValues(alpha:0.4),
                         child: IconButton(
                           icon: const Icon(
                             Icons.arrow_back_ios_new,
@@ -392,7 +392,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha:0.08),
                     blurRadius: 16,
                     offset: const Offset(0, -4),
                   ),

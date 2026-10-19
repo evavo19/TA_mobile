@@ -221,7 +221,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -397,49 +397,51 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Column(
-                    children: _paymentMethods.map((method) {
-                      final isSelected = _selectedPayment == method['name'];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isSelected
-                                ? primaryColor
-                                : Colors.grey.shade300,
-                            width: isSelected ? 1.8 : 1,
-                          ),
-                        ),
-                        child: RadioListTile<String>(
-                          activeColor: primaryColor,
-                          title: Text(
-                            method['name']!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                  RadioGroup<String>(
+                    groupValue: _selectedPayment,
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedPayment = val);
+                      }
+                    },
+                    child: Column(
+                      children: _paymentMethods.map((method) {
+                        final isSelected = _selectedPayment == method['name'];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected
+                                  ? primaryColor
+                                  : Colors.grey.shade300,
+                              width: isSelected ? 1.8 : 1,
                             ),
                           ),
-                          subtitle: Text(
-                            method['desc']!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.grey,
+                          child: RadioListTile<String>(
+                            activeColor: primaryColor,
+                            title: Text(
+                              method['name']!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
                             ),
+                            subtitle: Text(
+                              method['desc']!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            value: method['name']!,
                           ),
-                          value: method['name']!,
-                          groupValue: _selectedPayment,
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedPayment = val);
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ],
               ),
@@ -453,7 +455,7 @@ class _BookingScreenState extends State<BookingScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 10,
                   offset: const Offset(0, -4),
                 ),

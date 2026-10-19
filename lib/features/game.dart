@@ -15,9 +15,12 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isPlaying = false;
   bool _isGameOver = false;
   int _score = 0;
-  int _timeLeft = 20;
+  int _timeLeft = 15;
   Timer? _gameTimer;
   Timer? _spawnTimer;
+
+  // Target skor untuk menang
+  static const int _targetScore = 60;
 
   // Posisi Keranjang (0.0 sampai 1.0)
   double _basketX = 0.5;
@@ -31,12 +34,12 @@ class _QuizScreenState extends State<QuizScreen> {
       _isPlaying = true;
       _isGameOver = false;
       _score = 0;
-      _timeLeft = 20;
+      _timeLeft = 15;
       _items.clear();
       _basketX = 0.5;
     });
 
-    // Timer Hitung Mundur Game (20 detik)
+    // Timer Hitung Mundur Game (15 detik)
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timeLeft > 1) {
         setState(() {
@@ -48,16 +51,16 @@ class _QuizScreenState extends State<QuizScreen> {
     });
 
     // Loop Spawn Item Jatuh & Update Posisi
-    _spawnTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+    _spawnTimer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
       if (!_isPlaying) return;
 
       setState(() {
-        if (_random.nextDouble() < 0.2) {
+        if (_random.nextDouble() < 0.25) {
           _items.add(_FallingItem(
             x: _random.nextDouble(),
             y: 0,
             type: _getRandomItemType(),
-            speed: 0.02 + (_random.nextDouble() * 0.02),
+            speed: 0.035 + (_random.nextDouble() * 0.025),
           ));
         }
 
@@ -65,7 +68,7 @@ class _QuizScreenState extends State<QuizScreen> {
           _items[i].y += _items[i].speed;
 
           if (_items[i].y >= 0.85 && _items[i].y <= 0.95) {
-            if ((_items[i].x - _basketX).abs() < 0.15) {
+            if ((_items[i].x - _basketX).abs() < 0.12) {
               _applyItemScore(_items[i].type);
               _items.removeAt(i);
               continue;
@@ -82,23 +85,29 @@ class _QuizScreenState extends State<QuizScreen> {
 
   _ItemType _getRandomItemType() {
     double rand = _random.nextDouble();
-    if (rand < 0.5) return _ItemType.ticket; // 50% Tiket (+10)
-    if (rand < 0.8) return _ItemType.coin;   // 30% Koin (+20)
-    return _ItemType.bomb;                   // 20% Bom (-15)
+    if (rand < 0.40) return _ItemType.ticket; // 40% Tiket (+10)
+    if (rand < 0.65) return _ItemType.coin;   // 25% Koin (+20)
+    if (rand < 0.85) return _ItemType.bomb;   // 20% Bom (-20)
+    return _ItemType.zonk;                    // 15% Zonk (-30)
   }
 
   void _applyItemScore(_ItemType type) {
-    switch (type) {
-      case _ItemType.ticket:
-        _score += 10;
-        break;
-      case _ItemType.coin:
-        _score += 20;
-        break;
-      case _ItemType.bomb:
-        _score = max(0, _score - 15);
-        break;
-    }
+    setState(() {
+      switch (type) {
+        case _ItemType.ticket:
+          _score += 10;
+          break;
+        case _ItemType.coin:
+          _score += 20;
+          break;
+        case _ItemType.bomb:
+          _score = max(0, _score - 20);
+          break;
+        case _ItemType.zonk:
+          _score = max(0, _score - 30);
+          break;
+      }
+    });
   }
 
   void _endGame() {
@@ -114,25 +123,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _showResultDialog() {
-    bool isWin = _score >= 60;
-    
-    // Penentuan Nominal Voucher (Rp 1k - Rp 5k)
-    String voucherTitle = 'Potongan Rp 1.000';
-    String voucherCode = 'HEMAT1K';
-
-    if (_score >= 500) {
-      voucherTitle = 'Potongan Rp 5.000';
-      voucherCode = 'SULTAN5K';
-    } else if (_score >= 300) {
-      voucherTitle = 'Potongan Rp 4.000';
-      voucherCode = 'HEMAT4K';
-    } else if (_score >= 200) {
-      voucherTitle = 'Potongan Rp 3.000';
-      voucherCode = 'HEMAT3K';
-    } else if (_score >= 100) {
-      voucherTitle = 'Potongan Rp 2.000';
-      voucherCode = 'HEMAT2K';
-    }
+    bool isWin = _score >= _targetScore;
 
     showDialog(
       context: context,
@@ -140,68 +131,104 @@ class _QuizScreenState extends State<QuizScreen> {
       builder: (context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
-          title: Text(
-            isWin ? 'Hore! Kamu Menang!' : 'Coba Lagi Yuk!',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: isWin ? const Color(0xFF1550B6) : Colors.redAccent,
-            ),
+          title: Column(
+            children: [
+              Icon(
+                isWin ? Icons.emoji_events_rounded : Icons.sentiment_very_dissatisfied_rounded,
+                color: isWin ? Colors.amber : Colors.redAccent,
+                size: 52,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isWin ? 'Luar Biasa! Menang! 🎉' : 'Kena Zonk! Gagal! 💥',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: isWin ? const Color(0xFF1550B6) : Colors.redAccent,
+                ),
+              ),
+            ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Total Skor Kamu:',
-                style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
+                isWin
+                    ? 'Hebat banget! Kamu berhasil lolos dari Bom & Zonk serta tembus target $_targetScore poin.'
+                    : 'Wah, skor kamu belum cukup atau kena jebakan Zonk/Bom! Targetnya $_targetScore poin.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
               ),
-              Text(
-                '$_score Poin',
-                style: GoogleFonts.poppins(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1550B6),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F8FB),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Total Skor Akhir',
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                    ),
+                    Text(
+                      '$_score Poin',
+                      style: GoogleFonts.poppins(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: isWin ? const Color(0xFF1550B6) : Colors.redAccent,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               if (isWin) ...[
                 Text(
-                  'Kamu dapat $voucherTitle tiket wisata!',
-                  textAlign: TextAlign.center,
+                  'Selamat! Kamu mendapatkan:',
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  'Voucher Potongan Rp 4.000',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF6F8FB),
+                    color: Colors.amber.shade50,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF1550B6), width: 1.5),
+                    border: Border.all(color: Colors.amber.shade400, width: 1.5),
                   ),
                   child: SelectableText(
-                    voucherCode,
+                    'JOGJASULTAN4K',
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: const Color(0xFF1550B6),
-                      letterSpacing: 2,
+                      fontSize: 14,
+                      color: Colors.amber.shade900,
+                      letterSpacing: 1.5,
                     ),
                   ),
                 ),
               ] else ...[
                 Text(
-                  'Kumpulkan minimal 60 Poin untuk membuka voucher diskon tiket!',
+                  'Hati-hati dengan kotak Zonk (silang merah) dan Bom! Coba lagi biar lebih fokus.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                      fontSize: 12, color: Colors.grey.shade700),
+                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade700),
                 ),
               ]
             ],
@@ -213,10 +240,11 @@ class _QuizScreenState extends State<QuizScreen> {
                 _startGame();
               },
               child: Text(
-                'Main Lagi',
+                'Coba Lagi',
                 style: GoogleFonts.poppins(
-                    color: const Color(0xFF1550B6),
-                    fontWeight: FontWeight.bold),
+                  color: const Color(0xFF1550B6),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             ElevatedButton(
@@ -225,15 +253,17 @@ class _QuizScreenState extends State<QuizScreen> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1550B6),
+                backgroundColor: isWin ? const Color(0xFF1550B6) : Colors.grey.shade700,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
               child: Text(
-                'Tutup',
+                'Selesai',
                 style: GoogleFonts.poppins(
-                    color: Colors.white, fontWeight: FontWeight.bold),
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -257,7 +287,7 @@ class _QuizScreenState extends State<QuizScreen> {
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
         title: Text(
-          'Tangkap Tiket Wisata',
+          'Tangkap Tiket Ekstrem',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -287,9 +317,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       const Icon(Icons.stars, color: Colors.amber, size: 28),
                       const SizedBox(width: 6),
                       Text(
-                        'Skor: $_score',
+                        'Skor: $_score / Target: $_targetScore',
                         style: GoogleFonts.poppins(
-                          fontSize: 16,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: primaryColor,
                         ),
@@ -351,9 +381,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Tangkap Tiket & Koin!',
+                                    'Mode Ekstrem: Hati-hati Zonk!',
                                     style: GoogleFonts.poppins(
-                                      fontSize: 20,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                       color: primaryColor,
                                     ),
@@ -362,7 +392,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 32, vertical: 8),
                                     child: Text(
-                                      'Geser tas wisata dengan jarimu. Kumpulkan poin untuk dapatkan potongan harga Rp1.000 - Rp5.000!',
+                                      'Raih minimal $_targetScore poin dalam 15 detik! Hindari Bom 💥 dan kotak Zonk ❌ yang bakal mengurangi poin besar!',
                                       textAlign: TextAlign.center,
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
@@ -384,11 +414,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                         ),
                                       ),
                                       child: Text(
-                                        _isGameOver
-                                            ? 'MAIN LAGI'
-                                            : 'MULAI MAIN',
+                                        _isGameOver ? 'MAIN LAGI' : 'MULAI TANTANGAN',
                                         style: GoogleFonts.poppins(
-                                          fontSize: 16,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
@@ -410,18 +438,18 @@ class _QuizScreenState extends State<QuizScreen> {
 
                           if (_isPlaying)
                             Positioned(
-                              left: (_basketX * constraints.maxWidth) - 35,
+                              left: (_basketX * constraints.maxWidth) - 30,
                               top: constraints.maxHeight - 80,
                               child: Container(
-                                width: 70,
-                                height: 50,
+                                width: 60,
+                                height: 45,
                                 decoration: BoxDecoration(
                                   color: primaryColor,
                                   borderRadius: const BorderRadius.only(
-                                    bottomLeft: Radius.circular(20),
-                                    bottomRight: Radius.circular(20),
-                                    topLeft: Radius.circular(8),
-                                    topRight: Radius.circular(8),
+                                    bottomLeft: Radius.circular(16),
+                                    bottomRight: Radius.circular(16),
+                                    topLeft: Radius.circular(6),
+                                    topRight: Radius.circular(6),
                                   ),
                                   boxShadow: const [
                                     BoxShadow(
@@ -435,7 +463,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   child: Icon(
                                     Icons.shopping_bag_outlined,
                                     color: Colors.white,
-                                    size: 32,
+                                    size: 28,
                                   ),
                                 ),
                               ),
@@ -459,25 +487,31 @@ class _QuizScreenState extends State<QuizScreen> {
         return const Icon(
           Icons.confirmation_number_sharp,
           color: Colors.blueAccent,
-          size: 36,
+          size: 34,
         );
       case _ItemType.coin:
         return const Icon(
           Icons.monetization_on,
           color: Colors.amber,
-          size: 36,
+          size: 34,
         );
       case _ItemType.bomb:
         return const Icon(
-          Icons.brightness_7_sharp,
-          color: Colors.redAccent,
+          Icons.local_fire_department,
+          color: Colors.deepOrange,
+          size: 36,
+        );
+      case _ItemType.zonk:
+        return const Icon(
+          Icons.cancel,
+          color: Colors.red,
           size: 36,
         );
     }
   }
 }
 
-enum _ItemType { ticket, coin, bomb }
+enum _ItemType { ticket, coin, bomb, zonk }
 
 class _FallingItem {
   double x;

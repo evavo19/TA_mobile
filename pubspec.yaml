@@ -27,6 +27,7 @@ dependencies:
   # Sensor GPS Device & AI Chatbot Gemini:
   geolocator: ^10.1.0 # Sensor GPS Device Native
   google_generative_ai: ^0.4.0 # Gemini API
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

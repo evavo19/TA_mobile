@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LbsScreen extends StatefulWidget {
   const LbsScreen({super.key});
@@ -20,6 +21,10 @@ class _LbsScreenState extends State<LbsScreen> {
   LatLng _userLocation = const LatLng(-7.7926, 110.3658); // Default Malioboro
   String _currentLocationName = 'Mendapatkan lokasi GPS...';
   bool _isLoading = true;
+
+  // Destinasi Terpilih untuk Menampilkan Garis Rute (Polyline)
+  LatLng? _selectedDestination;
+  String? _selectedDestinationName;
 
   // Filter Radius Jarak
   String _selectedRadius = 'Semua';
@@ -42,6 +47,22 @@ class _LbsScreenState extends State<LbsScreen> {
         c((lat2 - lat1) * p) / 2 +
         c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
+  }
+
+  // Buka Google Maps Aplikasi Eksternal (100% Gratis)
+  Future<void> _openGoogleMaps(double lat, double lng) async {
+    final Uri googleMapsUrl = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+    if (await canLaunchUrl(googleMapsUrl)) {
+      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tidak dapat membuka aplikasi Google Maps')),
+        );
+      }
+    }
   }
 
   Future<void> _fetchLocationAndWisata() async {
@@ -130,6 +151,34 @@ class _LbsScreenState extends State<LbsScreen> {
     return _allWisata;
   }
 
+  void _selectDestination(LatLng targetLocation, String name) {
+    setState(() {
+      _selectedDestination = targetLocation;
+      _selectedDestinationName = name;
+    });
+
+    // Geser kamera peta ke lokasi tujuan
+    _mapController.move(targetLocation, 14.0);
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Rute menuju $name ditampilkan di peta.',
+          style: GoogleFonts.poppins(),
+        ),
+        backgroundColor: const Color(0xFF1550B6),
+        action: SnackBarAction(
+          label: 'BUKA MAPS',
+          textColor: Colors.amber,
+          onPressed: () {
+            _openGoogleMaps(targetLocation.latitude, targetLocation.longitude);
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
@@ -175,6 +224,19 @@ class _LbsScreenState extends State<LbsScreen> {
                                 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.example.lelunganjogja',
                           ),
+
+                          // Layer Garis Rute (Polyline) jika lokasi terpilih
+                          if (_selectedDestination != null)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: [_userLocation, _selectedDestination!],
+                                  strokeWidth: 4.0,
+                                  color: Colors.blueAccent,
+                                ),
+                              ],
+                            ),
+
                           MarkerLayer(
                             markers: [
                               // Marker Posisi Pengguna (Biru)
@@ -202,14 +264,9 @@ class _LbsScreenState extends State<LbsScreen> {
                                       size: 36,
                                     ),
                                     onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '${w['nama']} (${w['jarak']} km)',
-                                            style: GoogleFonts.poppins(),
-                                          ),
-                                          backgroundColor: primaryColor,
-                                        ),
+                                      _selectDestination(
+                                        w['location'] as LatLng,
+                                        w['nama'],
                                       );
                                     },
                                   ),
@@ -241,13 +298,31 @@ class _LbsScreenState extends State<LbsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _currentLocationName,
+                          _selectedDestinationName != null
+                              ? 'Rute ke: $_selectedDestinationName'
+                              : _currentLocationName,
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
+                      if (_selectedDestination != null)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedDestination = null;
+                              _selectedDestinationName = null;
+                            });
+                          },
+                          child: Text(
+                            'Hapus Rute',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -318,6 +393,8 @@ class _LbsScreenState extends State<LbsScreen> {
                           itemCount: _filteredWisata.length,
                           itemBuilder: (context, index) {
                             final item = _filteredWisata[index];
+                            final targetLoc = item['location'] as LatLng;
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
                               shape: RoundedRectangleBorder(
@@ -356,14 +433,21 @@ class _LbsScreenState extends State<LbsScreen> {
                                     color: Colors.grey.shade600,
                                   ),
                                 ),
+                                onTap: () {
+                                  // Menampilkan garis rute di peta internal
+                                  _selectDestination(targetLoc, item['nama']);
+                                },
                                 trailing: IconButton(
                                   icon: const Icon(
                                     Icons.navigation_outlined,
                                     color: primaryColor,
                                   ),
                                   onPressed: () {
-                                    _mapController.move(
-                                        item['location'] as LatLng, 14.0);
+                                    // Buka aplikasi Google Maps eksternal
+                                    _openGoogleMaps(
+                                      targetLoc.latitude,
+                                      targetLoc.longitude,
+                                    );
                                   },
                                 ),
                               ),

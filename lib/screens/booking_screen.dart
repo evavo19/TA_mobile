@@ -29,6 +29,7 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime? _selectedDate;
   int _jumlahTiket = 1;
   String _selectedPayment = 'QRIS';
+  OverlayEntry? _overlayEntry;
 
   final List<Map<String, String>> _paymentMethods = [
     {'name': 'QRIS', 'desc': 'Scan QR Code secara cepat'},
@@ -71,6 +72,66 @@ class _BookingScreenState extends State<BookingScreen> {
     return hargaKoin * _jumlahTiket;
   }
 
+  void _showTopNotification(String title, String message) {
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 10,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1550B6),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        message,
+                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      _overlayEntry?.remove();
+      _overlayEntry = null;
+    });
+  }
+
   Future<void> _prosesPembayaran() async {
     if (_selectedDate == null) return;
 
@@ -98,7 +159,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
     String generatedHash = '';
     try {
-      // 2. Simpan ke Blockchain Service (SHA-256 / Supabase blockchain_tiket)
+      // 2. Simpan ke Blockchain Service
       generatedHash = await BlockchainService.tambahBlok(
         ticketId: pesanan.qrCode,
         namaWisata: pesanan.namaWisata,
@@ -107,7 +168,7 @@ class _BookingScreenState extends State<BookingScreen> {
         totalHarga: pesanan.totalHarga,
       );
 
-      // 3. Simpan juga ke tabel 'pesanan' di Database Supabase
+      // 3. Simpan ke tabel 'pesanan' di Database Supabase
       final pesananData = {
         'user_id': user != null ? user.id : null,
         'wisata_id': widget.wisata.id,
@@ -128,142 +189,26 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     if (mounted) {
-      // Munculkan SnackBar notifikasi gaya temanmu
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pembayaran Berhasil',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      'Tiket ${pesanan.namaWisata} berhasil dipesan!',
-                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFF1550B6),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 16,
-            right: 16,
-            bottom: MediaQuery.of(context).size.height - 180,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          duration: const Duration(seconds: 3),
-          elevation: 8,
-        ),
+      // Tampilkan notifikasi di paling atas layar
+      _showTopNotification(
+        'Pembayaran Berhasil',
+        'Tiket ${pesanan.namaWisata} berhasil dipesan!',
       );
 
-      // Munculkan dialog sukses konfirmasi
-      _showSuccessDialog(pesanan, generatedHash);
-    }
-  }
-
-  void _showSuccessDialog(PesananModel pesanan, String hashTiket) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F1FF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF1550B6),
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Pembayaran Berhasil!',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1A1A1A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tiket wisata ${pesanan.namaWisata} berhasil dipesan. E-tiket kamu sudah siap!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ETicketScreen(
-                          pesanan: pesanan,
-                          hashTiket: hashTiket,
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1550B6),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: Text(
-                    'Lihat E-Tiket',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      // Langsung direct ke halaman E-Tiket setelah jeda singkat
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ETicketScreen(
+              pesanan: pesanan,
+              hashTiket: generatedHash,
+            ),
           ),
-        ),
-      ),
-    );
+        );
+      });
+    }
   }
 
   @override

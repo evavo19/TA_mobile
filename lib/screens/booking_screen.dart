@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/pesanan_model.dart';
 import '../models/wisata_model.dart';
 import '../screens/eticket_screen.dart';
@@ -76,9 +78,12 @@ class _BookingScreenState extends State<BookingScreen> {
         '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
 
     final String qrCodeId = 'TIC-${DateTime.now().millisecondsSinceEpoch}';
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
 
+    // 1. Buat Objek Pesanan Model
     final pesanan = PesananModel(
-      userId: 'user_temp_id',
+      userId: user != null ? user.id : 'user_temp_id',
       wisataId: widget.wisata.id,
       namaWisata: widget.wisata.nama,
       tanggalKunjungan: tanggalFormatted,
@@ -93,6 +98,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
     String generatedHash = '';
     try {
+      // 2. Simpan ke Blockchain Service (SHA-256 / Supabase blockchain_tiket)
       generatedHash = await BlockchainService.tambahBlok(
         ticketId: pesanan.qrCode,
         namaWisata: pesanan.namaWisata,
@@ -100,11 +106,74 @@ class _BookingScreenState extends State<BookingScreen> {
         jumlahTiket: pesanan.jumlahTiket,
         totalHarga: pesanan.totalHarga,
       );
+
+      // 3. Simpan juga ke tabel 'pesanan' di Database Supabase
+      final pesananData = {
+        'user_id': user != null ? user.id : null,
+        'wisata_id': widget.wisata.id,
+        'nama_wisata': widget.wisata.nama,
+        'tanggal_kunjungan': tanggalFormatted,
+        'jumlah_tiket': _jumlahTiket,
+        'total_harga': _calculateTotalPrice(),
+        'mata_uang': widget.selectedCurrency,
+        'metode_pembayaran': _selectedPayment,
+        'status': 'Lunas',
+        'qr_code': qrCodeId,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      await supabase.from('pesanan').insert(pesananData);
     } catch (e) {
-      debugPrint("Gagal mencatat blok tiket: $e");
+      debugPrint("Gagal memproses pembayaran / blockchain: $e");
     }
 
     if (mounted) {
+      // Munculkan SnackBar notifikasi gaya temanmu
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pembayaran Berhasil',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Tiket ${pesanan.namaWisata} berhasil dipesan!',
+                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF1550B6),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 10,
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(context).size.height - 180,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          duration: const Duration(seconds: 3),
+          elevation: 8,
+        ),
+      );
+
+      // Munculkan dialog sukses konfirmasi
       _showSuccessDialog(pesanan, generatedHash);
     }
   }

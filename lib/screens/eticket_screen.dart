@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/pesanan_model.dart';
 import '../services/blockchain_service.dart';
 
 class ETicketScreen extends StatefulWidget {
-  final PesananModel pesanan;
+  final PesananModel? pesanan; // Opsional jika dikirim langsung dari booking
   final String? hashTiket;
 
   const ETicketScreen({
     super.key,
-    required this.pesanan,
+    this.pesanan,
     this.hashTiket,
   });
 
@@ -19,6 +20,7 @@ class ETicketScreen extends StatefulWidget {
 }
 
 class _ETicketScreenState extends State<ETicketScreen> {
+  PesananModel? _currentPesanan;
   bool _isVerified = false;
   bool _isLoading = true;
   String _displayHash = '';
@@ -26,14 +28,60 @@ class _ETicketScreenState extends State<ETicketScreen> {
   @override
   void initState() {
     super.initState();
-    _verifyBlockchainData();
+    if (widget.pesanan != null) {
+      _currentPesanan = widget.pesanan;
+      _verifyBlockchainData(_currentPesanan!.qrCode, widget.hashTiket ?? '');
+    } else {
+      _loadLatestTicket();
+    }
   }
 
-  Future<void> _verifyBlockchainData() async {
-    String currentHash = widget.hashTiket ?? '';
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.pesanan == null) {
+      _loadLatestTicket();
+    }
+  }
 
+  // FUNGSI UNTUK MENGAMBIL TIKET TERBARU DARI DATABASE
+  Future<void> _loadLatestTicket() async {
+    setState(() => _isLoading = true);
+    final ticket = await _fetchLatestTicket();
+    
+    if (ticket != null) {
+      _currentPesanan = ticket;
+      await _verifyBlockchainData(ticket.qrCode, widget.hashTiket ?? '');
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<PesananModel?> _fetchLatestTicket() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final response = await supabase
+          .from('pesanan')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response != null) {
+        return PesananModel.fromMap(response);
+      }
+    } catch (e) {
+      print("Error ambil tiket: $e");
+    }
+    return null;
+  }
+
+  Future<void> _verifyBlockchainData(String qrCode, String currentHash) async {
     bool isAuthentic = await BlockchainService.verifikasiTiket(
-      widget.pesanan.qrCode,
+      qrCode,
       currentHash,
     );
 
@@ -63,153 +111,202 @@ class _ETicketScreenState extends State<ETicketScreen> {
             fontSize: 18,
           ),
         ),
+        centerTitle: true,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 12,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isLoading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _isVerified
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _currentPesanan == null
+              ? Center(
+                  // KONDISI KETIKA BELUM ADA TIKET
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          _isVerified
-                              ? Icons.verified_user_rounded
-                              : Icons.gpp_maybe_rounded,
-                          size: 16,
-                          color: _isVerified
-                              ? const Color(0xFF2E7D32)
-                              : Colors.red,
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.confirmation_number_outlined,
+                            size: 64,
+                            color: primaryColor,
+                          ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(height: 20),
                         Text(
-                          _isVerified
-                              ? 'Terverifikasi Blockchain ✓'
-                              : 'Belum Terverifikasi',
+                          'Belum Ada E-Tiket',
                           style: GoogleFonts.poppins(
-                            fontSize: 12,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: _isVerified
-                                ? const Color(0xFF2E7D32)
-                                : Colors.red,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Kamu belum memesan tiket wisata apapun. Silakan lakukan pemesanan melalui halaman detail wisata.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            height: 1.4,
                           ),
                         ),
                       ],
                     ),
                   ),
-
-                const SizedBox(height: 16),
-
-                Text(
-                  widget.pesanan.namaWisata,
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tanggal: ${widget.pesanan.tanggalKunjungan}',
-                  style: GoogleFonts.poppins(color: Colors.grey),
-                ),
-                const SizedBox(height: 20),
-
-                Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 100,
-                        color: primaryColor,
+                )
+              : Center(
+                  // KONDISI KETIKA ADA TIKET
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.grey.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Tunjukkan QR ini ke Petugas',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _isVerified
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFFFEBEE),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isVerified
+                                      ? Icons.verified_user_rounded
+                                      : Icons.gpp_maybe_rounded,
+                                  size: 16,
+                                  color: _isVerified
+                                      ? const Color(0xFF2E7D32)
+                                      : Colors.red,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isVerified
+                                      ? 'Terverifikasi Blockchain ✓'
+                                      : 'Belum Terverifikasi',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isVerified
+                                        ? const Color(0xFF2E7D32)
+                                        : Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _currentPesanan!.namaWisata,
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tanggal: ${_currentPesanan!.tanggalKunjungan}',
+                            style: GoogleFonts.poppins(color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // QR Code Placeholder
+                          Container(
+                            width: 180,
+                            height: 180,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.qr_code_2_rounded,
+                                  size: 100,
+                                  color: primaryColor,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tunjukkan QR ini ke Petugas',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          if (_displayHash.isNotEmpty) ...[
+                            Text(
+                              'Hash Tiket (Blockchain):',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            SelectableText(
+                              _displayHash.length > 20
+                                  ? '${_displayHash.substring(0, 16)}...'
+                                  : _displayHash,
+                              style: GoogleFonts.firaCode(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: primaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          Text(
+                            'Jumlah Tiket: ${_currentPesanan!.jumlahTiket} Orang',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Total: ${_currentPesanan!.mataUang} ${_currentPesanan!.totalHarga.toStringAsFixed(0)}',
+                            style: GoogleFonts.poppins(
+                              color: primaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                if (_displayHash.isNotEmpty) ...[
-                  Text(
-                    'Hash Tiket (Blockchain):',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  SelectableText(
-                    _displayHash.length > 20
-                        ? '${_displayHash.substring(0, 16)}...'
-                        : _displayHash,
-                    style: GoogleFonts.firaCode(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                Text(
-                  'Jumlah Tiket: ${widget.pesanan.jumlahTiket} Orang',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                 ),
-                Text(
-                  'Total: ${widget.pesanan.mataUang} ${widget.pesanan.totalHarga.toStringAsFixed(0)}',
-                  style: GoogleFonts.poppins(
-                    color: primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

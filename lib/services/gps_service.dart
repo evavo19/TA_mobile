@@ -1,6 +1,8 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -40,10 +42,16 @@ class _LbsScreenState extends State<LbsScreen> {
   }
 
   // Hitung Jarak Haversine (km)
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     var p = 0.017453292519943295;
     var c = cos;
-    var a = 0.5 -
+    var a =
+        0.5 -
         c((lat2 - lat1) * p) / 2 +
         c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
@@ -59,7 +67,9 @@ class _LbsScreenState extends State<LbsScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka aplikasi Google Maps')),
+          const SnackBar(
+            content: Text('Tidak dapat membuka aplikasi Google Maps'),
+          ),
         );
       }
     }
@@ -91,9 +101,7 @@ class _LbsScreenState extends State<LbsScreen> {
 
     try {
       // 2. Fetch Data dari Tabel 'wisata' Supabase
-      final response = await Supabase.instance.client
-          .from('wisata')
-          .select();
+      final response = await Supabase.instance.client.from('wisata').select();
 
       final List<dynamic> data = response;
 
@@ -122,7 +130,9 @@ class _LbsScreenState extends State<LbsScreen> {
       }).toList();
 
       // Urutkan dari yang terdekat
-      loadedWisata.sort((a, b) => (a['jarak'] as double).compareTo(b['jarak'] as double));
+      loadedWisata.sort(
+        (a, b) => (a['jarak'] as double).compareTo(b['jarak'] as double),
+      );
 
       setState(() {
         _allWisata = loadedWisata;
@@ -220,9 +230,10 @@ class _LbsScreenState extends State<LbsScreen> {
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.example.lelunganjogja',
+                            // CANCELLABLE TILE PROVIDER UNTUK MENGHILANGKAN WARNING & OPTIMALISASI WEB
+                            tileProvider: CancellableNetworkTileProvider(),
                           ),
 
                           // Layer Garis Rute (Polyline) jika lokasi terpilih
@@ -230,7 +241,10 @@ class _LbsScreenState extends State<LbsScreen> {
                             PolylineLayer(
                               polylines: [
                                 Polyline(
-                                  points: [_userLocation, _selectedDestination!],
+                                  points: [
+                                    _userLocation,
+                                    _selectedDestination!,
+                                  ],
                                   strokeWidth: 4.0,
                                   color: Colors.blueAccent,
                                 ),
@@ -282,7 +296,10 @@ class _LbsScreenState extends State<LbsScreen> {
                         child: FloatingActionButton.small(
                           backgroundColor: Colors.white,
                           onPressed: _fetchLocationAndWisata,
-                          child: const Icon(Icons.gps_fixed, color: primaryColor),
+                          child: const Icon(
+                            Icons.gps_fixed,
+                            color: primaryColor,
+                          ),
                         ),
                       ),
                     ],
@@ -294,7 +311,11 @@ class _LbsScreenState extends State<LbsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Row(
                     children: [
-                      const Icon(Icons.location_on, color: primaryColor, size: 20),
+                      const Icon(
+                        Icons.location_on,
+                        color: primaryColor,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -412,11 +433,13 @@ class _LbsScreenState extends State<LbsScreen> {
                                     errorBuilder:
                                         (context, error, stackTrace) =>
                                             Container(
-                                      width: 70,
-                                      height: 70,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(Icons.landscape),
-                                    ),
+                                              width: 70,
+                                              height: 70,
+                                              color: Colors.grey.shade300,
+                                              child: const Icon(
+                                                Icons.landscape,
+                                              ),
+                                            ),
                                   ),
                                 ),
                                 title: Text(

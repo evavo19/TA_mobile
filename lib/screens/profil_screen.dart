@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,12 +26,11 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
   UserModel? _currentUserModel;
   bool _isLoading = true;
 
-  // Variabel Byte Foto Profil (Bisa untuk Web & HP)
   Uint8List? _imageBytes;
+  String? _avatarUrl;
   final ImagePicker _picker = ImagePicker();
 
-  // List Sidik Jari Terdaftar
-  List<String> _fingerprints = [];
+  final List<String> _fingerprints = [];
   final LocalAuthentication _auth = LocalAuthentication();
 
   @override
@@ -38,7 +39,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     _loadUserData();
   }
 
-  // Memuat Data Profil dari Supabase
   Future<void> _loadUserData() async {
     final user = _supabase.auth.currentUser;
 
@@ -53,6 +53,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
         if (data != null) {
           setState(() {
             _currentUserModel = UserModel.fromJson(data);
+            _avatarUrl = data['avatar_url'];
           });
         } else {
           setState(() {
@@ -73,7 +74,69 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     }
   }
 
-  // Update Data Profil ke Supabase
+  Future<void> _uploadAvatar(Uint8List imageBytes) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final fileName =
+          '${user.id}_${DateTime.now().millisecondsSinceEpoch}.png';
+
+      // 1. Upload ke Storage Bucket 'avatars'
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            fileName,
+            imageBytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/png',
+              upsert: true,
+            ),
+          );
+
+      // 2. Ambil URL Publik
+      final String publicUrl = _supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+      // 3. Simpan HANYA ID, Email, dan URL Avatar ke tabel profiles (Aman dari error kolom nama)
+      final Map<String, dynamic> payload = {
+        'id': user.id,
+        'email': user.email ?? '',
+        'avatar_url': publicUrl,
+      };
+
+      await _supabase.from('profiles').upsert(payload);
+
+      setState(() {
+        _imageBytes = imageBytes;
+        _avatarUrl = publicUrl;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Foto profil berhasil tersimpan!',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: const Color(0xFF1550B6),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error upload avatar: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengunggah foto profil: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _updateUserData(UserModel updatedModel) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -114,12 +177,54 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     }
   }
 
-  // MODAL FITUR ZOMM & CROP PREVIEW FOTO PROFIL
-  void _showCropPreviewDialog(Uint8List rawBytes) {
+  Future<Uint8List> _cropTransformedImage(
+    ui.Image originalImage,
+    Matrix4 transformMatrix,
+    double previewSize,
+  ) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(
+      recorder,
+      Rect.fromLTWH(0, 0, previewSize, previewSize),
+    );
+
+    final clipPath = Path()
+      ..addOval(Rect.fromLTWH(0, 0, previewSize, previewSize));
+    canvas.clipPath(clipPath);
+
+    double scaleToFit = previewSize / originalImage.height;
+    if (originalImage.width * scaleToFit < previewSize) {
+      scaleToFit = previewSize / originalImage.width;
+    }
+    double initialDx = (previewSize - originalImage.width * scaleToFit) / 2;
+    double initialDy = (previewSize - originalImage.height * scaleToFit) / 2;
+
+    canvas.transform(transformMatrix.storage);
+    canvas.translate(initialDx, initialDy);
+    canvas.scale(scaleToFit);
+
+    canvas.drawImage(originalImage, Offset.zero, Paint());
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(previewSize.toInt(), previewSize.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  void _showCropPreviewDialog(Uint8List rawBytes) async {
+    final codec = await ui.instantiateImageCodec(rawBytes);
+    final frameInfo = await codec.getNextFrame();
+    final ui.Image decodedImage = frameInfo.image;
+
+    final transformationController = TransformationController();
+    const double previewSize = 220.0;
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogContext) {
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -139,7 +244,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Cubit untuk Zoom / Geser gambar ke posisi lingkaran',
+                  'Geser & zoom foto agar pas di dalam lingkaran',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: Colors.grey.shade600,
@@ -147,31 +252,30 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-
-                // Area Crop / Zoom Preview Lingkaran
                 Stack(
                   alignment: Alignment.center,
                   children: [
                     Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
+                      width: previewSize,
+                      height: previewSize,
+                      decoration: const BoxDecoration(
                         color: Colors.black12,
-                        borderRadius: BorderRadius.circular(100),
+                        shape: BoxShape.circle,
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: InteractiveViewer(
+                        transformationController: transformationController,
                         panEnabled: true,
-                        boundaryMargin: const EdgeInsets.all(80),
-                        minScale: 0.8,
+                        boundaryMargin: const EdgeInsets.all(200),
+                        minScale: 0.5,
                         maxScale: 4.0,
-                        child: Image.memory(rawBytes, fit: BoxFit.cover),
+                        child: Image.memory(rawBytes, fit: BoxFit.contain),
                       ),
                     ),
                     IgnorePointer(
                       child: Container(
-                        width: 200,
-                        height: 200,
+                        width: previewSize,
+                        height: previewSize,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
@@ -184,12 +288,11 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(dialogContext),
                         style: OutlinedButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -204,20 +307,17 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _imageBytes = rawBytes;
-                          });
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Foto profil berhasil diperbarui!',
-                                style: GoogleFonts.poppins(),
-                              ),
-                              backgroundColor: const Color(0xFF1550B6),
-                            ),
+                        onPressed: () async {
+                          final croppedBytes = await _cropTransformedImage(
+                            decodedImage,
+                            transformationController.value,
+                            previewSize,
                           );
+
+                          if (!dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+
+                          _uploadAvatar(croppedBytes);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1550B6),
@@ -241,18 +341,16 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     );
   }
 
-  // FUNGSI MEMILIH FOTO DARI GALERI / KAMERA
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
+        maxWidth: 1200,
+        maxHeight: 1200,
         imageQuality: 90,
       );
 
       if (pickedFile != null) {
-        // Read sebagai Uint8List agar kompatibel penuh dengan Flutter Web & Mobile
         final bytes = await pickedFile.readAsBytes();
         _showCropPreviewDialog(bytes);
       }
@@ -261,14 +359,13 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     }
   }
 
-  // MODAL PILIHAN SUMBER FOTO
   void _showImagePickerOptions() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
@@ -290,7 +387,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 ),
                 title: Text('Pilih dari Galeri', style: GoogleFonts.poppins()),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _pickImage(ImageSource.gallery);
                 },
               ),
@@ -301,7 +398,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 ),
                 title: Text('Ambil dari Kamera', style: GoogleFonts.poppins()),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _pickImage(ImageSource.camera);
                 },
               ),
@@ -312,7 +409,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     );
   }
 
-  // Modal Edit Identitas Diri
   void _showEditProfileDialog() {
     final model = _currentUserModel;
     final user = _supabase.auth.currentUser;
@@ -328,7 +424,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
@@ -336,7 +432,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 left: 20,
                 right: 20,
                 top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -370,8 +466,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Input Nama Lengkap
                     TextField(
                       controller: nameController,
                       style: GoogleFonts.poppins(fontSize: 14),
@@ -390,8 +484,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // Email Permanen
                     TextField(
                       controller: TextEditingController(
                         text: user?.email ?? model?.email ?? '',
@@ -417,8 +509,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // Input No. Telepon
                     TextField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
@@ -438,8 +528,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // Usia & Gender
                     Row(
                       children: [
                         Expanded(
@@ -467,7 +555,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: selectedGender,
+                            initialValue: selectedGender,
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               color: Colors.black87,
@@ -505,8 +593,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-
-                    // Input Alamat
                     TextField(
                       controller: addressController,
                       maxLines: 2,
@@ -525,10 +611,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Tombol Simpan
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -545,7 +628,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           );
 
                           _updateUserData(newModel);
-                          Navigator.pop(context);
+                          Navigator.pop(sheetContext);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1550B6),
@@ -573,7 +656,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     );
   }
 
-  // Edit / Hapus Sidik Jari Terdaftar
   void _showFingerprintOptions(int index, String currentName) {
     final editNameController = TextEditingController(text: currentName);
 
@@ -582,7 +664,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
@@ -620,7 +702,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         setState(() {
                           _fingerprints.removeAt(index);
                         });
-                        Navigator.pop(context);
+                        Navigator.pop(sheetContext);
+                        if (!mounted) return;
                         Navigator.pop(context);
                         _showBiometricManageModal();
                       },
@@ -639,7 +722,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         setState(() {
                           _fingerprints[index] = editNameController.text.trim();
                         });
-                        Navigator.pop(context);
+                        Navigator.pop(sheetContext);
+                        if (!mounted) return;
                         Navigator.pop(context);
                         _showBiometricManageModal();
                       },
@@ -659,18 +743,17 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     );
   }
 
-  // ALUR DUA LANGKAH TAMBAH SIDIK JARI
   void _openAddFingerprintFlow() {
     int currentStep = 1;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setStepState) {
             return Container(
@@ -681,12 +764,15 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                   Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Color(0xFF1550B6),
+                        ),
                         onPressed: () {
                           if (currentStep == 2) {
                             setStepState(() => currentStep = 1);
                           } else {
-                            Navigator.pop(context);
+                            Navigator.pop(sheetContext);
                           }
                         },
                       ),
@@ -694,7 +780,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       Text(
                         'Sidik Jari',
                         style: GoogleFonts.poppins(
-                          color: Colors.white,
+                          color: const Color(0xFF1550B6),
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -702,7 +788,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   if (currentStep == 1) ...[
                     Expanded(
                       child: Column(
@@ -712,9 +797,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             width: 200,
                             height: 260,
                             decoration: BoxDecoration(
+                              color: const Color(0xFFF6F8FB),
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: Colors.grey.shade800,
+                                color: Colors.grey.shade300,
                                 width: 2,
                               ),
                             ),
@@ -753,7 +839,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         ],
                       ),
                     ),
-
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -778,7 +863,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                   ],
-
                   if (currentStep == 2) ...[
                     Expanded(
                       child: Column(
@@ -787,7 +871,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           Text(
                             'Letakkan jari Anda',
                             style: GoogleFonts.poppins(
-                              color: Colors.white,
+                              color: const Color(0xFF1550B6),
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
@@ -797,7 +881,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             'Letakkan jari Anda di atas sensor\ndan angkat setelah merasakan getaran',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
-                              color: Colors.grey.shade400,
+                              color: Colors.grey.shade600,
                               fontSize: 14,
                               height: 1.4,
                             ),
@@ -823,19 +907,23 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                     'Sidik Jari ${_fingerprints.length + 1}',
                                   );
                                 });
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                  Navigator.pop(context);
-                                  _showBiometricManageModal();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Sidik jari berhasil didaftarkan!',
-                                      ),
-                                      backgroundColor: Color(0xFF1550B6),
+
+                                if (!sheetContext.mounted) return;
+                                Navigator.pop(sheetContext);
+
+                                if (!mounted) return;
+                                Navigator.pop(context);
+                                _showBiometricManageModal();
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Sidik jari berhasil didaftarkan!',
+                                      style: GoogleFonts.poppins(),
                                     ),
-                                  );
-                                }
+                                    backgroundColor: const Color(0xFF1550B6),
+                                  ),
+                                );
                               }
                             },
                             child: const Icon(
@@ -860,19 +948,21 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
   Widget _buildInstructionRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white70, size: 22),
+        Icon(icon, color: const Color(0xFF1550B6), size: 22),
         const SizedBox(width: 14),
         Expanded(
           child: Text(
             text,
-            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+            style: GoogleFonts.poppins(
+              color: Colors.grey.shade800,
+              fontSize: 13,
+            ),
           ),
         ),
       ],
     );
   }
 
-  // Modal Utama Kelola Biometrik
   void _showBiometricManageModal() {
     showModalBottomSheet(
       context: context,
@@ -880,7 +970,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
@@ -909,7 +999,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   if (_fingerprints.isNotEmpty) ...[
                     ..._fingerprints.asMap().entries.map((entry) {
                       int idx = entry.key;
@@ -945,7 +1034,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     }),
                     const SizedBox(height: 12),
                   ],
-
                   InkWell(
                     onTap: _openAddFingerprintFlow,
                     borderRadius: BorderRadius.circular(12),
@@ -978,6 +1066,16 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
         );
       },
     );
+  }
+
+  ImageProvider? _getProfileImage() {
+    if (_imageBytes != null) {
+      return MemoryImage(_imageBytes!);
+    }
+    if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+      return NetworkImage(_avatarUrl!);
+    }
+    return null;
   }
 
   @override
@@ -1017,7 +1115,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // FOTO PROFIL (Tampil menggunakan Image.memory agar pasti muncul)
                                 GestureDetector(
                                   onTap: _showImagePickerOptions,
                                   child: Stack(
@@ -1029,10 +1126,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                         child: CircleAvatar(
                                           radius: 36,
                                           backgroundColor: Colors.white,
-                                          backgroundImage: _imageBytes != null
-                                              ? MemoryImage(_imageBytes!)
-                                              : null,
-                                          child: _imageBytes == null
+                                          backgroundImage: _getProfileImage(),
+                                          child: _getProfileImage() == null
                                               ? const Icon(
                                                   Icons.person,
                                                   size: 42,
@@ -1057,8 +1152,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-
-                                // Nama Simetris Presisi
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   mainAxisSize: MainAxisSize.min,
@@ -1095,8 +1188,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 2),
-
-                                // Email User
                                 Text(
                                   user?.email ??
                                       (_currentUserModel?.email.isNotEmpty ==
@@ -1132,7 +1223,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-
                     _buildMenuItem(
                       icon: Icons.near_me_outlined,
                       title: 'Wisata Terdekat (LBS)',
@@ -1146,7 +1236,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         );
                       },
                     ),
-
                     _buildMenuItem(
                       icon: Icons.sports_esports_outlined,
                       title: 'Tangkap Tiket Wisata',
@@ -1160,7 +1249,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         );
                       },
                     ),
-
                     _buildMenuItem(
                       icon: Icons.rate_review_outlined,
                       title: 'Saran & Kesan PAM',
@@ -1174,7 +1262,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         );
                       },
                     ),
-
                     const SizedBox(height: 20),
                     Text(
                       'Akun & Keamanan',
@@ -1185,16 +1272,12 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-
-                    // Keamanan & Biometrik
                     _buildMenuItem(
                       icon: Icons.security_outlined,
                       title: 'Keamanan & Biometrik',
                       subtitle: 'Kelola & hapus akses sidik jari/wajah',
                       onTap: _showBiometricManageModal,
                     ),
-
-                    // Keluar
                     _buildMenuItem(
                       icon: Icons.logout,
                       title: 'Keluar',
@@ -1204,7 +1287,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       onTap: () {
                         showDialog(
                           context: context,
-                          builder: (context) => AlertDialog(
+                          builder: (dialogContext) => AlertDialog(
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
                             ),
@@ -1220,7 +1303,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () => Navigator.pop(dialogContext),
                                 child: Text(
                                   'Batal',
                                   style: GoogleFonts.poppins(
@@ -1230,18 +1313,16 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                               ),
                               ElevatedButton(
                                 onPressed: () async {
-                                  Navigator.pop(context);
+                                  final navigator = Navigator.of(context);
+                                  Navigator.pop(dialogContext);
                                   await _supabase.auth.signOut();
-                                  if (context.mounted) {
-                                    Navigator.pushAndRemoveUntil(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const LoginScreen(),
-                                      ),
-                                      (route) => false,
-                                    );
-                                  }
+                                  if (!mounted) return;
+                                  navigator.pushAndRemoveUntil(
+                                    MaterialPageRoute(
+                                      builder: (context) => const LoginScreen(),
+                                    ),
+                                    (route) => false,
+                                  );
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.redAccent,

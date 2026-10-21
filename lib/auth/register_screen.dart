@@ -147,6 +147,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return sha256.convert(bytes).toString();
   }
 
+  // Fungsi Validasi Kombinasi Password (Minimal 8 Karakter, Huruf, Angka, dan Simbol)
+  bool _isPasswordValid(String password) {
+    if (password.length < 8) return false;
+    final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
+    final hasDigit = RegExp(r'[0-9]').hasMatch(password);
+    final hasSymbol = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
+    return hasLetter && hasDigit && hasSymbol;
+  }
+
   // FUNGSI REGISTER DENGAN VALIDASI EMAIL & INTEGRASI SUPABASE
   Future<void> _handleRegister() async {
     String name = _nameController.text.trim();
@@ -166,12 +175,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Validasi format email sederhana agar sesuai standar
+    // Validasi format email
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(email)) {
       _showCustomDialog(
         title: 'Format Email Salah',
         message: 'Masukkan format email yang valid (contoh: nama@gmail.com)',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    // Validasi syarat password (huruf + angka + simbol)
+    if (!_isPasswordValid(password)) {
+      _showCustomDialog(
+        title: 'Password Lemah',
+        message: 'Password harus minimal 8 karakter dan merupakan kombinasi dari huruf, angka, serta simbol (contoh: @, #, \$).',
         isSuccess: false,
       );
       return;
@@ -212,8 +231,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (mounted) {
           _showCustomDialog(
             title: 'Pendaftaran Berhasil!',
-            message:
-                'Akun kamu telah berhasil dibuat. Silakan masuk untuk melanjutkan.',
+            message: 'Akun kamu telah berhasil dibuat. Silakan masuk untuk melanjutkan.',
             isSuccess: true,
             onSuccessPressed: () {
               Navigator.pop(context);
@@ -315,6 +333,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildInputField(
                     controller: _nameController,
@@ -329,6 +348,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 16),
+
+                  // Kotak Petunjuk / Ketentuan Password
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F5FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD0E1FD)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: primaryColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Ketentuan Password:\n• Minimal 8 karakter\n• Kombinasi huruf, angka, dan simbol (@, #, \$, dll)',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: const Color(0xFF1E293B),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
                   _buildInputField(
                     controller: _passwordController,
                     label: 'Password',

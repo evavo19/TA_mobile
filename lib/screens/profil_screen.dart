@@ -117,7 +117,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Foto profil berhasil tersimpan!',
+              'Foto profil berhasil tersimpan di database!',
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: const Color(0xFF1550B6),

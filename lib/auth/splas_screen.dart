@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'onboarding_screen.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
-  void _navigateToOnboarding(BuildContext context) {
+  void _navigateToLogin(BuildContext context) {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
     );
   }
 
@@ -18,7 +18,7 @@ class SplashScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _navigateToOnboarding(context),
+        onTap: () => _navigateToLogin(context),
         child: SizedBox(
           width: double.infinity,
           height: double.infinity,

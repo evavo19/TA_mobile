@@ -42,6 +42,4 @@ flutter:
   assets:
     - .env
     - assets/LelunganJogja.jpg
-    - assets/tugu.jpg
-    - assets/keraton.jpg
-    - assets/pemandangan.jpg
+   

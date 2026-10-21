@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/pesanan_model.dart';
 import '../models/wisata_model.dart';
 import '../screens/eticket_screen.dart';
+import '../services/blockchain_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final WisataModel wisata;
@@ -27,6 +29,7 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime? _selectedDate;
   int _jumlahTiket = 1;
   String _selectedPayment = 'QRIS';
+  OverlayEntry? _overlayEntry;
 
   final List<Map<String, String>> _paymentMethods = [
     {'name': 'QRIS', 'desc': 'Scan QR Code secara cepat'},
@@ -69,15 +72,79 @@ class _BookingScreenState extends State<BookingScreen> {
     return hargaKoin * _jumlahTiket;
   }
 
-  void _prosesPembayaran() {
+  void _showTopNotification(String title, String message) {
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 10,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1550B6),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        message,
+                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      _overlayEntry?.remove();
+      _overlayEntry = null;
+    });
+  }
+
+  Future<void> _prosesPembayaran() async {
     if (_selectedDate == null) return;
 
     String tanggalFormatted =
         '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
 
-    // Membuat instance PesananModel
+    final String qrCodeId = 'TIC-${DateTime.now().millisecondsSinceEpoch}';
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    // 1. Buat Objek Pesanan Model
     final pesanan = PesananModel(
-      userId: 'user_temp_id', // Nanti otomatis terisi dari Supabase Auth
+      userId: user != null ? user.id : 'user_temp_id',
       wisataId: widget.wisata.id,
       namaWisata: widget.wisata.nama,
       tanggalKunjungan: tanggalFormatted,
@@ -86,97 +153,62 @@ class _BookingScreenState extends State<BookingScreen> {
       mataUang: widget.selectedCurrency,
       metodePembayaran: _selectedPayment,
       status: 'Lunas',
-      qrCode: 'TIC-${DateTime.now().millisecondsSinceEpoch}',
+      qrCode: qrCodeId,
       createdAt: DateTime.now(),
     );
 
-    _showSuccessDialog(pesanan);
-  }
+    String generatedHash = '';
+    try {
+      // 2. Simpan ke Blockchain Service
+      generatedHash = await BlockchainService.tambahBlok(
+        ticketId: pesanan.qrCode,
+        namaWisata: pesanan.namaWisata,
+        tanggalKunjungan: pesanan.tanggalKunjungan,
+        jumlahTiket: pesanan.jumlahTiket,
+        totalHarga: pesanan.totalHarga,
+      );
 
-  void _showSuccessDialog(PesananModel pesanan) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F1FF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF1550B6),
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Pembayaran Berhasil!',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1A1A1A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tiket wisata ${pesanan.namaWisata} berhasil dipesan. E-tiket kamu sudah siap!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Tutup dialog
-                    Navigator.pop(context); // Kembali dari booking screen
+      // 3. Simpan ke tabel 'pesanan' di Database Supabase
+      final pesananData = {
+        'user_id': user != null ? user.id : null,
+        'wisata_id': widget.wisata.id,
+        'nama_wisata': widget.wisata.nama,
+        'tanggal_kunjungan': tanggalFormatted,
+        'jumlah_tiket': _jumlahTiket,
+        'total_harga': _calculateTotalPrice(),
+        'mata_uang': widget.selectedCurrency,
+        'metode_pembayaran': _selectedPayment,
+        'status': 'Lunas',
+        'qr_code': qrCodeId,
+        'created_at': DateTime.now().toIso8601String(),
+      };
 
-                    // Pindah ke Halaman E-Tiket
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ETicketScreen(pesanan: pesanan),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1550B6),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: Text(
-                    'Lihat E-Tiket',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      await supabase.from('pesanan').insert(pesananData);
+    } catch (e) {
+      debugPrint("Gagal memproses pembayaran / blockchain: $e");
+    }
+
+    if (mounted) {
+      // Tampilkan notifikasi di paling atas layar
+      _showTopNotification(
+        'Pembayaran Berhasil',
+        'Tiket ${pesanan.namaWisata} berhasil dipesan!',
+      );
+
+      // Langsung direct ke halaman E-Tiket setelah jeda singkat
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ETicketScreen(
+              pesanan: pesanan,
+              hashTiket: generatedHash,
+            ),
           ),
-        ),
-      ),
-    );
+        );
+      });
+    }
   }
 
   @override
@@ -213,7 +245,6 @@ class _BookingScreenState extends State<BookingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Card Info Wisata Ringkas
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -221,7 +252,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: Colors.black.withOpacity(0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -238,14 +269,14 @@ class _BookingScreenState extends State<BookingScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  width: 70,
-                                  height: 70,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(
-                                    Icons.broken_image_outlined,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey.shade200,
+                              child: const Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -280,7 +311,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Pilih Tanggal Kunjungan
                   Text(
                     'Tanggal Kunjungan',
                     style: GoogleFonts.poppins(
@@ -331,7 +361,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Jumlah Tiket
                   Text(
                     'Jumlah Tiket',
                     style: GoogleFonts.poppins(
@@ -387,7 +416,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Metode Pembayaran
                   Text(
                     'Metode Pembayaran',
                     style: GoogleFonts.poppins(
@@ -397,65 +425,62 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  RadioGroup<String>(
-                    groupValue: _selectedPayment,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedPayment = val);
-                      }
-                    },
-                    child: Column(
-                      children: _paymentMethods.map((method) {
-                        final isSelected = _selectedPayment == method['name'];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? primaryColor
-                                  : Colors.grey.shade300,
-                              width: isSelected ? 1.8 : 1,
+                  Column(
+                    children: _paymentMethods.map((method) {
+                      final isSelected = _selectedPayment == method['name'];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected
+                                ? primaryColor
+                                : Colors.grey.shade300,
+                            width: isSelected ? 1.8 : 1,
+                          ),
+                        ),
+                        child: RadioListTile<String>(
+                          activeColor: primaryColor,
+                          groupValue: _selectedPayment,
+                          value: method['name']!,
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _selectedPayment = val);
+                            }
+                          },
+                          title: Text(
+                            method['name']!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
-                          child: RadioListTile<String>(
-                            activeColor: primaryColor,
-                            title: Text(
-                              method['name']!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
+                          subtitle: Text(
+                            method['desc']!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.grey,
                             ),
-                            subtitle: Text(
-                              method['desc']!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            value: method['name']!,
                           ),
-                        );
-                      }).toList(),
-                    ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
             ),
           ),
 
-          // Bottom Bar Total & Bayar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
+                  color: Colors.black.withOpacity(0.06),
                   blurRadius: 10,
                   offset: const Offset(0, -4),
                 ),

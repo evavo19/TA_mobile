@@ -1,7 +1,7 @@
 class PesananModel {
-  final String? id;
+  final int? id;
   final String userId;
-  final int wisataId;
+  final dynamic wisataId; // <-- Diubah menjadi dynamic agar bisa menerima int maupun String
   final String namaWisata;
   final String tanggalKunjungan;
   final int jumlahTiket;
@@ -9,8 +9,8 @@ class PesananModel {
   final String mataUang;
   final String metodePembayaran;
   final String status;
-  final String? qrCode;
-  final DateTime? createdAt;
+  final String qrCode;
+  final DateTime createdAt;
 
   PesananModel({
     this.id,
@@ -22,34 +22,34 @@ class PesananModel {
     required this.totalHarga,
     required this.mataUang,
     required this.metodePembayaran,
-    this.status = 'Lunas',
-    this.qrCode,
-    this.createdAt,
+    required this.status,
+    required this.qrCode,
+    required this.createdAt,
   });
 
   factory PesananModel.fromMap(Map<String, dynamic> map) {
     return PesananModel(
-      id: map['id']?.toString(),
+      id: map['id'],
       userId: map['user_id'] ?? '',
-      wisataId: map['wisata_id'] ?? 0,
+      wisataId: map['wisata_id'] ?? '',
       namaWisata: map['nama_wisata'] ?? '',
       tanggalKunjungan: map['tanggal_kunjungan'] ?? '',
       jumlahTiket: map['jumlah_tiket'] ?? 1,
       totalHarga: (map['total_harga'] ?? 0).toDouble(),
       mataUang: map['mata_uang'] ?? 'IDR',
-      metodePembayaran: map['metode_pembayaran'] ?? 'QRIS',
+      metodePembayaran: map['metode_pembayaran'] ?? '',
       status: map['status'] ?? 'Lunas',
-      qrCode: map['qr_code'],
+      qrCode: map['qr_code'] ?? map['qr_code_id'] ?? map['ticket_id'] ?? '',
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
-          : null,
+          : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
-      'wisata_id': wisataId,
+      'wisataId': wisataId, // Disimpan apa adanya
       'nama_wisata': namaWisata,
       'tanggal_kunjungan': tanggalKunjungan,
       'jumlah_tiket': jumlahTiket,
@@ -58,6 +58,7 @@ class PesananModel {
       'metode_pembayaran': metodePembayaran,
       'status': status,
       'qr_code': qrCode,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 }

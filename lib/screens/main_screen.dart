@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../features/chatbot.dart';
-import '../models/pesanan_model.dart';
 import 'eticket_screen.dart';
 import 'home_screen.dart';
 import 'profil_screen.dart';
@@ -25,20 +24,8 @@ class _MainScreenState extends State<MainScreen> {
       // Tab 0: Beranda
       const HomeScreen(),
 
-      // Tab 1: Tiket Saya (Terhubung ke ETicketScreen)
-      ETicketScreen(
-        pesanan: PesananModel(
-          userId: 'user_demo',
-          wisataId: 1,
-          namaWisata: 'Candi Prambanan',
-          tanggalKunjungan: '20/10/2026',
-          jumlahTiket: 2,
-          totalHarga: 100000,
-          mataUang: 'IDR',
-          metodePembayaran: 'QRIS',
-          qrCode: 'TIC-DEMO-12345',
-        ),
-      ),
+      // Tab 1: Tiket Saya (Otomatis mengambil data pesanan terbaru dari database Supabase)
+      const ETicketScreen(),
 
       // Tab 2: Asisten AI
       const ChatbotScreen(),

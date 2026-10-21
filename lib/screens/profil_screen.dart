@@ -1,6 +1,3 @@
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -124,7 +121,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       barrierDismissible: false,
       builder: (context) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -142,7 +141,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 Text(
                   'Cubit untuk Zoom / Geser gambar ke posisi lingkaran',
                   style: GoogleFonts.poppins(
-                      fontSize: 12, color: Colors.grey.shade600),
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
@@ -164,10 +165,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         boundaryMargin: const EdgeInsets.all(80),
                         minScale: 0.8,
                         maxScale: 4.0,
-                        child: Image.memory(
-                          rawBytes,
-                          fit: BoxFit.cover,
-                        ),
+                        child: Image.memory(rawBytes, fit: BoxFit.cover),
                       ),
                     ),
                     IgnorePointer(
@@ -176,7 +174,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         height: 200,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1550B6), width: 3),
+                          border: Border.all(
+                            color: const Color(0xFF1550B6),
+                            width: 3,
+                          ),
                         ),
                       ),
                     ),
@@ -194,8 +195,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: Text('Batal',
-                            style: GoogleFonts.poppins(color: Colors.grey)),
+                        child: Text(
+                          'Batal',
+                          style: GoogleFonts.poppins(color: Colors.grey),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -222,8 +225,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: Text('Gunakan',
-                            style: GoogleFonts.poppins(color: Colors.white)),
+                        child: Text(
+                          'Gunakan',
+                          style: GoogleFonts.poppins(color: Colors.white),
+                        ),
                       ),
                     ),
                   ],
@@ -279,8 +284,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: const Icon(Icons.photo_library_outlined,
-                    color: Color(0xFF1550B6)),
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: Color(0xFF1550B6),
+                ),
                 title: Text('Pilih dari Galeri', style: GoogleFonts.poppins()),
                 onTap: () {
                   Navigator.pop(context);
@@ -288,8 +295,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt_outlined,
-                    color: Color(0xFF1550B6)),
+                leading: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Color(0xFF1550B6),
+                ),
                 title: Text('Ambil dari Kamera', style: GoogleFonts.poppins()),
                 onTap: () {
                   Navigator.pop(context);
@@ -368,8 +377,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
                         labelText: 'Nama Lengkap',
-                        prefixIcon: const Icon(Icons.person_outline,
-                            color: Color(0xFF1550B6)),
+                        prefixIcon: const Icon(
+                          Icons.person_outline,
+                          color: Color(0xFF1550B6),
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF6F8FB),
                         border: OutlineInputBorder(
@@ -383,15 +394,20 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     // Email Permanen
                     TextField(
                       controller: TextEditingController(
-                          text: user?.email ?? model?.email ?? ''),
+                        text: user?.email ?? model?.email ?? '',
+                      ),
                       readOnly: true,
                       enabled: false,
                       style: GoogleFonts.poppins(
-                          fontSize: 14, color: Colors.grey.shade700),
+                        fontSize: 14,
+                        color: Colors.grey.shade700,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Email (Permanen)',
-                        prefixIcon: const Icon(Icons.email_outlined,
-                            color: Colors.grey),
+                        prefixIcon: const Icon(
+                          Icons.email_outlined,
+                          color: Colors.grey,
+                        ),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -409,8 +425,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
                         labelText: 'No. Telepon / WhatsApp',
-                        prefixIcon: const Icon(Icons.phone_outlined,
-                            color: Color(0xFF1550B6)),
+                        prefixIcon: const Icon(
+                          Icons.phone_outlined,
+                          color: Color(0xFF1550B6),
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF6F8FB),
                         border: OutlineInputBorder(
@@ -431,14 +449,17 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             style: GoogleFonts.poppins(fontSize: 14),
                             decoration: InputDecoration(
                               labelText: 'Usia (Tahun)',
-                              prefixIcon: const Icon(Icons.cake_outlined,
-                                  color: Color(0xFF1550B6)),
+                              prefixIcon: const Icon(
+                                Icons.cake_outlined,
+                                color: Color(0xFF1550B6),
+                              ),
                               filled: true,
                               fillColor: const Color(0xFFF6F8FB),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    BorderSide(color: Colors.grey.shade200),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade200,
+                                ),
                               ),
                             ),
                           ),
@@ -448,24 +469,33 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           child: DropdownButtonFormField<String>(
                             value: selectedGender,
                             style: GoogleFonts.poppins(
-                                fontSize: 14, color: Colors.black87),
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
                             decoration: InputDecoration(
                               labelText: 'Gender',
-                              prefixIcon: const Icon(Icons.wc_outlined,
-                                  color: Color(0xFF1550B6)),
+                              prefixIcon: const Icon(
+                                Icons.wc_outlined,
+                                color: Color(0xFF1550B6),
+                              ),
                               filled: true,
                               fillColor: const Color(0xFFF6F8FB),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    BorderSide(color: Colors.grey.shade200),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade200,
+                                ),
                               ),
                             ),
                             items: const [
                               DropdownMenuItem(
-                                  value: 'Laki-laki', child: Text('Laki-laki')),
+                                value: 'Laki-laki',
+                                child: Text('Laki-laki'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Perempuan', child: Text('Perempuan')),
+                                value: 'Perempuan',
+                                child: Text('Perempuan'),
+                              ),
                             ],
                             onChanged: (val) {
                               setModalState(() => selectedGender = val);
@@ -483,8 +513,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
                         labelText: 'Alamat Tempat Tinggal',
-                        prefixIcon: const Icon(Icons.home_outlined,
-                            color: Color(0xFF1550B6)),
+                        prefixIcon: const Icon(
+                          Icons.home_outlined,
+                          color: Color(0xFF1550B6),
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF6F8FB),
                         border: OutlineInputBorder(
@@ -560,7 +592,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
               Text(
                 'Kelola Sidik Jari: $currentName',
                 style: GoogleFonts.poppins(
-                    fontSize: 16, fontWeight: FontWeight.bold),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -568,7 +602,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                 decoration: InputDecoration(
                   labelText: 'Nama Sidik Jari',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -609,8 +644,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         _showBiometricManageModal();
                       },
                       icon: const Icon(Icons.check, color: Colors.white),
-                      label: const Text('Simpan',
-                          style: TextStyle(color: Colors.white)),
+                      label: const Text(
+                        'Simpan',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                   ),
                 ],
@@ -677,7 +714,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                  color: Colors.grey.shade800, width: 2),
+                                color: Colors.grey.shade800,
+                                width: 2,
+                              ),
                             ),
                             child: Stack(
                               alignment: Alignment.center,
@@ -697,15 +736,20 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             ),
                           ),
                           const SizedBox(height: 32),
-                          _buildInstructionRow(Icons.wb_sunny_outlined,
-                              'Hindari lingkungan dengan cahaya yang kuat'),
+                          _buildInstructionRow(
+                            Icons.wb_sunny_outlined,
+                            'Hindari lingkungan dengan cahaya yang kuat',
+                          ),
                           const SizedBox(height: 14),
                           _buildInstructionRow(
-                              Icons.stay_current_portrait_outlined,
-                              'Jaga layar tetap bersih dan rapi'),
+                            Icons.stay_current_portrait_outlined,
+                            'Jaga layar tetap bersih dan rapi',
+                          ),
                           const SizedBox(height: 14),
-                          _buildInstructionRow(Icons.style_outlined,
-                              'Gunakan anti-gores bersertifikat resmi'),
+                          _buildInstructionRow(
+                            Icons.style_outlined,
+                            'Gunakan anti-gores bersertifikat resmi',
+                          ),
                         ],
                       ),
                     ),
@@ -766,7 +810,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                 authenticated = await _auth.authenticate(
                                   localizedReason: 'Pindai sidik jari Anda',
                                   options: const AuthenticationOptions(
-                                      biometricOnly: true),
+                                    biometricOnly: true,
+                                  ),
                                 );
                               } catch (e) {
                                 authenticated = true;
@@ -775,7 +820,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                               if (authenticated) {
                                 setState(() {
                                   _fingerprints.add(
-                                      'Sidik Jari ${_fingerprints.length + 1}');
+                                    'Sidik Jari ${_fingerprints.length + 1}',
+                                  );
                                 });
                                 if (mounted) {
                                   Navigator.pop(context);
@@ -784,7 +830,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
-                                          'Sidik jari berhasil didaftarkan!'),
+                                        'Sidik jari berhasil didaftarkan!',
+                                      ),
                                       backgroundColor: Color(0xFF1550B6),
                                     ),
                                   );
@@ -872,8 +919,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         children: [
                           ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.fingerprint,
-                                color: Color(0xFF1550B6)),
+                            leading: const Icon(
+                              Icons.fingerprint,
+                              color: Color(0xFF1550B6),
+                            ),
                             title: Text(
                               fpName,
                               style: GoogleFonts.poppins(
@@ -939,131 +988,138 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryColor),
-            )
+          ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : NestedScrollView(
               headerSliverBuilder:
                   (BuildContext context, bool innerBoxIsScrolled) {
-                return <Widget>[
-                  SliverAppBar(
-                    expandedHeight: 220.0,
-                    floating: false,
-                    pinned: true,
-                    backgroundColor: primaryColor,
-                    elevation: 0,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: Container(
-                        decoration: const BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(28),
-                            bottomRight: Radius.circular(28),
-                          ),
-                        ),
-                        padding: const EdgeInsets.only(
-                            top: 48, bottom: 16, left: 16, right: 16),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // FOTO PROFIL (Tampil menggunakan Image.memory agar pasti muncul)
-                            GestureDetector(
-                              onTap: _showImagePickerOptions,
-                              child: Stack(
-                                alignment: Alignment.bottomRight,
-                                children: [
-                                  CircleAvatar(
-                                    radius: 40,
-                                    backgroundColor: Colors.white24,
-                                    child: CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.white,
-                                      backgroundImage: _imageBytes != null
-                                          ? MemoryImage(_imageBytes!)
-                                          : null,
-                                      child: _imageBytes == null
-                                          ? const Icon(
-                                              Icons.person,
-                                              size: 42,
-                                              color: primaryColor,
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.camera_alt,
-                                      size: 14,
-                                      color: primaryColor,
-                                    ),
-                                  ),
-                                ],
+                    return <Widget>[
+                      SliverAppBar(
+                        expandedHeight: 220.0,
+                        floating: false,
+                        pinned: true,
+                        backgroundColor: primaryColor,
+                        elevation: 0,
+                        flexibleSpace: FlexibleSpaceBar(
+                          background: Container(
+                            decoration: const BoxDecoration(
+                              color: primaryColor,
+                              borderRadius: BorderRadius.only(
+                                bottomLeft: Radius.circular(28),
+                                bottomRight: Radius.circular(28),
                               ),
                             ),
-                            const SizedBox(height: 10),
-
-                            // Nama Simetris Presisi
-                            Row(
+                            padding: const EdgeInsets.only(
+                              top: 48,
+                              bottom: 16,
+                              left: 16,
+                              right: 16,
+                            ),
+                            child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    (_currentUserModel?.fullName != null &&
-                                            _currentUserModel!.fullName.isNotEmpty)
-                                        ? _currentUserModel!.fullName
-                                        : (user?.userMetadata?['full_name'] ??
-                                            'Belum Diisi'),
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
+                                // FOTO PROFIL (Tampil menggunakan Image.memory agar pasti muncul)
+                                GestureDetector(
+                                  onTap: _showImagePickerOptions,
+                                  child: Stack(
+                                    alignment: Alignment.bottomRight,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 40,
+                                        backgroundColor: Colors.white24,
+                                        child: CircleAvatar(
+                                          radius: 36,
+                                          backgroundColor: Colors.white,
+                                          backgroundImage: _imageBytes != null
+                                              ? MemoryImage(_imageBytes!)
+                                              : null,
+                                          child: _imageBytes == null
+                                              ? const Icon(
+                                                  Icons.person,
+                                                  size: 42,
+                                                  color: primaryColor,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt,
+                                          size: 14,
+                                          color: primaryColor,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                InkWell(
-                                  onTap: _showEditProfileDialog,
-                                  child: const Padding(
-                                    padding: EdgeInsets.all(4.0),
-                                    child: Icon(
-                                      Icons.edit,
-                                      size: 16,
-                                      color: Colors.white70,
+                                const SizedBox(height: 10),
+
+                                // Nama Simetris Presisi
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        (_currentUserModel?.fullName != null &&
+                                                _currentUserModel!
+                                                    .fullName
+                                                    .isNotEmpty)
+                                            ? _currentUserModel!.fullName
+                                            : (user?.userMetadata?['full_name'] ??
+                                                  'Belum Diisi'),
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
                                     ),
+                                    const SizedBox(width: 6),
+                                    InkWell(
+                                      onTap: _showEditProfileDialog,
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4.0),
+                                        child: Icon(
+                                          Icons.edit,
+                                          size: 16,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+
+                                // Email User
+                                Text(
+                                  user?.email ??
+                                      (_currentUserModel?.email.isNotEmpty ==
+                                              true
+                                          ? _currentUserModel!.email
+                                          : 'Tidak ada email'),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    color: Colors.white70,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-
-                            // Email User
-                            Text(
-                              user?.email ??
-                                  (_currentUserModel?.email.isNotEmpty == true
-                                      ? _currentUserModel!.email
-                                      : 'Tidak ada email'),
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ];
-              },
+                    ];
+                  },
               body: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1150,11 +1206,13 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           context: context,
                           builder: (context) => AlertDialog(
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20)),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                             title: Text(
                               'Keluar Akun',
                               style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.bold),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             content: Text(
                               'Apakah kamu yakin ingin keluar dari LelunganJogja?',
@@ -1163,9 +1221,12 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: Text('Batal',
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.grey)),
+                                child: Text(
+                                  'Batal',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.grey,
+                                  ),
+                                ),
                               ),
                               ElevatedButton(
                                 onPressed: () async {
@@ -1175,8 +1236,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                     Navigator.pushAndRemoveUntil(
                                       context,
                                       MaterialPageRoute(
-                                          builder: (context) =>
-                                              const LoginScreen()),
+                                        builder: (context) =>
+                                            const LoginScreen(),
+                                      ),
                                       (route) => false,
                                     );
                                   }
@@ -1188,9 +1250,12 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: Text('Keluar',
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.white)),
+                                child: Text(
+                                  'Keluar',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -1241,10 +1306,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
         ),
         subtitle: Text(
           subtitle,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
+          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
         ),
         trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       ),

@@ -3,7 +3,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/login_screen.dart';
-import 'auth/onboarding_screen.dart';
 import 'auth/splas_screen.dart'; // Sesuaikan jika nama filenya splash_screen.dart
 import 'screens/main_screen.dart';
 
@@ -34,7 +33,6 @@ class MyApp extends StatelessWidget {
       initialRoute: '/', // Rute pertama kali buka adalah SplashScreen
       routes: {
         '/': (context) => const SplashScreen(),
-        '/onboarding': (context) => const OnboardingScreen(),
         '/login': (context) => const LoginScreen(),
         '/main': (context) => const MainScreen(),
       },

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sensors_plus/sensors_plus.dart'; // 👈 Import package sensor
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -18,6 +19,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _timeLeft = 15;
   Timer? _gameTimer;
   Timer? _spawnTimer;
+  StreamSubscription? _accelerometerSubscription; // 👈 Untuk listener sensor
 
   // Target skor untuk menang
   static const int _targetScore = 60;
@@ -28,6 +30,28 @@ class _QuizScreenState extends State<QuizScreen> {
   // List Item yang Jatuh
   final List<_FallingItem> _items = [];
   final Random _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _initSensor(); // 👈 Mulai mendengarkan sensor saat halaman dibuka
+  }
+
+  // Fungsi untuk membaca sensor akselerometer (kemiringan HP)
+  void _initSensor() {
+    _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
+      if (!_isPlaying) return;
+
+      setState(() {
+        // Sumbu Y pada event akselerometer mendeteksi kemiringan kiri-kanan HP
+        // Kita kalikan faktor pengali (misal 0.05) agar pergerakan keranjang mulus dan tidak terlalu ngebut
+        _basketX -= event.y * 0.04; 
+
+        // Batasi agar keranjang tidak keluar layar (antara 0.05 sampai 0.95)
+        _basketX = _basketX.clamp(0.05, 0.95);
+      });
+    });
+  }
 
   void _startGame() {
     setState(() {
@@ -276,6 +300,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void dispose() {
     _gameTimer?.cancel();
     _spawnTimer?.cancel();
+    _accelerometerSubscription?.cancel(); // 👈 Matikan sensor saat keluar halaman agar tidak boros baterai
     super.dispose();
   }
 
@@ -287,11 +312,11 @@ class _QuizScreenState extends State<QuizScreen> {
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
         title: Text(
-          'Tangkap Tiket Ekstrem',
+          'Tangkap Tiket Ekstrem (Sensor Miring)',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.bold,
             color: Colors.white,
-            fontSize: 18,
+            fontSize: 16,
           ),
         ),
         backgroundColor: primaryColor,
@@ -349,127 +374,118 @@ class _QuizScreenState extends State<QuizScreen> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  return GestureDetector(
-                    onHorizontalDragUpdate: (details) {
-                      if (!_isPlaying) return;
-                      setState(() {
-                        _basketX += details.delta.dx / constraints.maxWidth;
-                        _basketX = _basketX.clamp(0.05, 0.95);
-                      });
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0xFFE3F2FD), Colors.white],
-                        ),
+                  return Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFE3F2FD), Colors.white],
                       ),
-                      child: Stack(
-                        children: [
-                          if (!_isPlaying)
-                            Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.sports_esports_outlined,
-                                    size: 80,
+                    ),
+                    child: Stack(
+                      children: [
+                        if (!_isPlaying)
+                          Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.screen_rotation_outlined,
+                                  size: 80,
+                                  color: primaryColor,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Miringkan HP untuk Menangkap!',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
                                     color: primaryColor,
                                   ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Mode Ekstrem: Hati-hati Zonk!',
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 32, vertical: 8),
+                                  child: Text(
+                                    'Pegang HP dan miringkan ke kiri/kanan untuk menggerakkan keranjang. Raih $_targetScore poin!',
+                                    textAlign: TextAlign.center,
                                     style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: primaryColor,
+                                      fontSize: 12,
+                                      color: Colors.grey.shade700,
                                     ),
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 32, vertical: 8),
+                                ),
+                                const SizedBox(height: 20),
+                                SizedBox(
+                                  width: 200,
+                                  height: 50,
+                                  child: ElevatedButton(
+                                    onPressed: _startGame,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(25),
+                                      ),
+                                    ),
                                     child: Text(
-                                      'Raih minimal $_targetScore poin dalam 15 detik! Hindari Bom 💥 dan kotak Zonk ❌ yang bakal mengurangi poin besar!',
-                                      textAlign: TextAlign.center,
+                                      _isGameOver ? 'MAIN LAGI' : 'MULAI TANTANGAN',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade700,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: 200,
-                                    height: 50,
-                                    child: ElevatedButton(
-                                      onPressed: _startGame,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryColor,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(25),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        _isGameOver ? 'MAIN LAGI' : 'MULAI TANTANGAN',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        if (_isPlaying)
+                          ..._items.map((item) {
+                            return Positioned(
+                              left: item.x * (constraints.maxWidth - 40),
+                              top: item.y * (constraints.maxHeight - 40),
+                              child: _buildFallingIcon(item.type),
+                            );
+                          }),
+
+                        if (_isPlaying)
+                          Positioned(
+                            left: (_basketX * constraints.maxWidth) - 30,
+                            top: constraints.maxHeight - 80,
+                            child: Container(
+                              width: 60,
+                              height: 45,
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(16),
+                                  topLeft: Radius.circular(6),
+                                  topRight: Radius.circular(6),
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 4),
+                                  )
                                 ],
                               ),
-                            ),
-
-                          if (_isPlaying)
-                            ..._items.map((item) {
-                              return Positioned(
-                                left: item.x * (constraints.maxWidth - 40),
-                                top: item.y * (constraints.maxHeight - 40),
-                                child: _buildFallingIcon(item.type),
-                              );
-                            }),
-
-                          if (_isPlaying)
-                            Positioned(
-                              left: (_basketX * constraints.maxWidth) - 30,
-                              top: constraints.maxHeight - 80,
-                              child: Container(
-                                width: 60,
-                                height: 45,
-                                decoration: BoxDecoration(
-                                  color: primaryColor,
-                                  borderRadius: const BorderRadius.only(
-                                    bottomLeft: Radius.circular(16),
-                                    bottomRight: Radius.circular(16),
-                                    topLeft: Radius.circular(6),
-                                    topRight: Radius.circular(6),
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 4),
-                                    )
-                                  ],
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.shopping_bag_outlined,
-                                    color: Colors.white,
-                                    size: 28,
-                                  ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.shopping_bag_outlined,
+                                  color: Colors.white,
+                                  size: 28,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   );
                 },

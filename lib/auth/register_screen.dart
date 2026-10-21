@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,7 +16,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _supabase = Supabase.instance.client;
 
-  // Variable visibilitas password
   bool _isObscurePassword = true;
   bool _isObscureConfirmPassword = true;
   bool _isLoading = false;
@@ -33,7 +29,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // Helper Custom Pop-up Dialog
   void _showCustomDialog({
     required String title,
     required String message,
@@ -60,7 +55,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Ikon Lingkaran Khas UI Jogja Go
                 Container(
                   width: 68,
                   height: 68,
@@ -79,8 +73,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Judul Pop-up
                 Text(
                   title,
                   textAlign: TextAlign.center,
@@ -91,8 +83,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Pesan Deskripsi
                 Text(
                   message,
                   textAlign: TextAlign.center,
@@ -103,8 +93,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Tombol Kapsul
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -142,12 +130,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  String _hashPassword(String password) {
-    var bytes = utf8.encode(password);
-    return sha256.convert(bytes).toString();
-  }
-
-  // Fungsi Validasi Kombinasi Password (Minimal 8 Karakter, Huruf, Angka, dan Simbol)
   bool _isPasswordValid(String password) {
     if (password.length < 8) return false;
     final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
@@ -156,7 +138,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return hasLetter && hasDigit && hasSymbol;
   }
 
-  // FUNGSI REGISTER DENGAN VALIDASI EMAIL & INTEGRASI SUPABASE
   Future<void> _handleRegister() async {
     String name = _nameController.text.trim();
     String email = _emailController.text.trim();
@@ -175,18 +156,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Validasi format email
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(email)) {
       _showCustomDialog(
         title: 'Format Email Salah',
-        message: 'Masukkan format email yang valid (contoh: nama@gmail.com)',
+        message: 'Masukkan format email yang valid (contoh: nama@domain.com)',
         isSuccess: false,
       );
       return;
     }
 
-    // Validasi syarat password (huruf + angka + simbol)
     if (!_isPasswordValid(password)) {
       _showCustomDialog(
         title: 'Password Lemah',
@@ -205,13 +184,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    String hashedPassword = _hashPassword(password);
-    debugPrint("User Registered: $name | $email \vert{} Hash:$hashedPassword");
-
     setState(() => _isLoading = true);
 
     try {
-      // 1. Mendaftarkan Akun Resmi ke Supabase Auth
+      // 1. Mendaftarkan Akun ke Supabase Auth
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
@@ -221,7 +197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final user = response.user;
 
       if (user != null) {
-        // 2. Buat Baris Awal di Tabel `profiles` Supabase
+        // 2. Menyimpan data profil awal ke tabel profiles
         await _supabase.from('profiles').upsert({
           'id': user.id,
           'email': email,
@@ -234,7 +210,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             message: 'Akun kamu telah berhasil dibuat. Silakan masuk untuk melanjutkan.',
             isSuccess: true,
             onSuccessPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(context); // Kembali ke LoginScreen
             },
           );
         }
@@ -269,7 +245,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Atas
             Stack(
               children: [
                 Container(
@@ -326,10 +301,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 28),
-
-            // Form Input Pendaftaran
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
@@ -348,8 +320,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 16),
-
-                  // Kotak Petunjuk / Ketentuan Password
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -379,9 +349,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   _buildInputField(
                     controller: _passwordController,
                     label: 'Password',
@@ -407,10 +375,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 28),
-
-                  // Tombol Daftar
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -442,10 +407,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 20),
-
-                  // Navigasi Kembali ke Login
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

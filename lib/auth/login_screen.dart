@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
@@ -31,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Helper Custom Pop-up Dialog
   void _showCustomDialog({
     required String title,
     required String message,
@@ -58,7 +54,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Ikon Lingkaran
                 Container(
                   width: 68,
                   height: 68,
@@ -77,8 +72,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Judul Pop-up
                 Text(
                   title,
                   textAlign: TextAlign.center,
@@ -89,8 +82,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Pesan Deskripsi
                 Text(
                   message,
                   textAlign: TextAlign.center,
@@ -101,8 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Tombol Kapsul
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -123,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: Text(
-                      isSuccess ? 'Lanjut' : 'Coba Lagi',
+                      isSuccess ? 'Lanjut ke Utama' : 'Coba Lagi',
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -140,13 +129,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  String _hashPassword(String password) {
-    var bytes = utf8.encode(password);
-    var digest = sha256.convert(bytes);
-    return digest.toString();
-  }
-
-  // FUNGSI LOGIN DENGAN INTEGRASI SUPABASE BACKEND & VALIDASI EMAIL
   Future<void> _handleLogin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text;
@@ -160,7 +142,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Validasi format email fleksibel
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(email)) {
       _showCustomDialog(
@@ -171,13 +152,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    String hashedPassword = _hashPassword(password);
-    debugPrint("Password Terenkripsi (SHA-256): $hashedPassword");
-
     setState(() => _isLoading = true);
 
     try {
-      // Verifikasi akun ke Supabase Auth
+      // Verifikasi login langsung ke Supabase Auth
       final response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
@@ -251,7 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Atas
             Stack(
               children: [
                 Container(
@@ -318,12 +295,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 28),
 
-            // Form Input Login
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  // Field Email
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -359,7 +334,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Field Password
                   TextField(
                     controller: _passwordController,
                     obscureText: _isObscure,
@@ -409,7 +383,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 28),
 
-                  // Tombol Masuk + Sidik Jari
                   Row(
                     children: [
                       Expanded(
@@ -468,7 +441,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Navigasi Pindah ke Register
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

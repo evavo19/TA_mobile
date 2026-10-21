@@ -19,6 +19,8 @@ dependencies:
   # Paket Tambahan Tugas Akhir PAM:
   crypto: ^3.0.3 # Enkripsi Password (SHA-256)
   local_auth: ^2.1.6 # Login Biometric (Fingerprint/Face ID)
+  permission_handler: ^11.3.1 # Manajemen Izin Perangkat
+  flutter_local_notifications: ^17.2.2 # Notifikasi Lokal
 
   # Paket Peta LBS (OpenStreetMap - Web/Map API)
   flutter_map: ^6.1.0
@@ -45,4 +47,3 @@ flutter:
   assets:
     - .env
     - assets/LelunganJogja.jpg
-   

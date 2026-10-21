@@ -1,0 +1,36 @@
+import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
+
+class BiometricService {
+  static final LocalAuthentication _auth = LocalAuthentication();
+
+  // 1. Cek apakah perangkat mendukung biometrik (Sidik Jari / Face ID)
+  static Future<bool> apakahBiometrikTersedia() async {
+    try {
+      final bool canAuthenticateWithBiometrics = await _auth.canCheckBiometrics;
+      final bool canAuthenticate =
+          canAuthenticateWithBiometrics || await _auth.isDeviceSupported();
+      return canAuthenticate;
+    } on PlatformException catch (e) {
+      print("Error cek biometrik: $e");
+      return false;
+    }
+  }
+
+  // 2. Jalankan proses pemindaian biometrik
+  static Future<bool> autentikasiBiometrik() async {
+    try {
+      final bool didAuthenticate = await _auth.authenticate(
+        localizedReason: 'Gunakan sidik jari atau wajah Anda untuk masuk', // <-- Ubah ke localizedReason
+        options: const AuthenticationOptions(
+          biometricOnly: true, // Hanya izinkan biometrik (bukan PIN/pola HP)
+          stickyAuth: true,
+        ),
+      );
+      return didAuthenticate;
+    } on PlatformException catch (e) {
+      print("Error autentikasi: $e");
+      return false;
+    }
+  }
+}

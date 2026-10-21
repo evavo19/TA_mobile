@@ -29,6 +29,8 @@ dependencies:
   google_generative_ai: ^0.4.0 # Gemini API
   url_launcher: ^6.2.5
   flutter_dotenv: ^5.1.0 # Paket untuk membaca file .env
+  image_picker: ^1.2.4
+  image_cropper: ^13.0.0
 
 dev_dependencies:
   flutter_test:

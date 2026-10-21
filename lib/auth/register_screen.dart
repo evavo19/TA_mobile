@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,10 +17,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _supabase = Supabase.instance.client;
 
   // Variable visibilitas password
   bool _isObscurePassword = true;
   bool _isObscureConfirmPassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -101,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Tombol Kapsul Sesuai Referensi UI
+                // Tombol Kapsul
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -144,7 +147,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return sha256.convert(bytes).toString();
   }
 
-  void _handleRegister() {
+  // FUNGSI REGISTER DENGAN VALIDASI EMAIL & INTEGRASI SUPABASE
+  Future<void> _handleRegister() async {
     String name = _nameController.text.trim();
     String email = _emailController.text.trim();
     String password = _passwordController.text;
@@ -162,6 +166,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // Validasi format email sederhana agar sesuai standar
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      _showCustomDialog(
+        title: 'Format Email Salah',
+        message: 'Masukkan format email yang valid (contoh: nama@gmail.com)',
+        isSuccess: false,
+      );
+      return;
+    }
+
     if (password != confirmPassword) {
       _showCustomDialog(
         title: 'Password Tidak Cocok',
@@ -172,17 +187,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     String hashedPassword = _hashPassword(password);
-    debugPrint("User Registered: $name | $email | Hash: $hashedPassword");
+    debugPrint("User Registered: $name | $email \vert{} Hash:$hashedPassword");
 
-    _showCustomDialog(
-      title: 'Pendaftaran Berhasil!',
-      message:
-          'Akun kamu telah berhasil dibuat. Silakan masuk untuk melanjutkan.',
-      isSuccess: true,
-      onSuccessPressed: () {
-        Navigator.pop(context);
-      },
-    );
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Mendaftarkan Akun Resmi ke Supabase Auth
+      final response = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': name},
+      );
+
+      final user = response.user;
+
+      if (user != null) {
+        // 2. Buat Baris Awal di Tabel `profiles` Supabase
+        await _supabase.from('profiles').upsert({
+          'id': user.id,
+          'email': email,
+          'fullName': name,
+        });
+
+        if (mounted) {
+          _showCustomDialog(
+            title: 'Pendaftaran Berhasil!',
+            message:
+                'Akun kamu telah berhasil dibuat. Silakan masuk untuk melanjutkan.',
+            isSuccess: true,
+            onSuccessPressed: () {
+              Navigator.pop(context);
+            },
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        _showCustomDialog(
+          title: 'Pendaftaran Gagal',
+          message: e.message,
+          isSuccess: false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showCustomDialog(
+          title: 'Terjadi Kesalahan',
+          message: 'Gagal membuat akun: $e',
+          isSuccess: false,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -305,7 +362,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _handleRegister,
+                      onPressed: _isLoading ? null : _handleRegister,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         elevation: 0,
@@ -313,14 +370,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           borderRadius: BorderRadius.circular(26),
                         ),
                       ),
-                      child: Text(
-                        'Daftar Sekarang',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              'Daftar Sekarang',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
 

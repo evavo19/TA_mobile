@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../auth/login_screen.dart';
 import '../features/feedback.dart';
 import '../features/game.dart';
+import '../models/user_model.dart';
 import '../services/gps_service.dart';
-import '../auth/login_screen.dart';
 
 class PlaceholderProfilScreen extends StatefulWidget {
   const PlaceholderProfilScreen({super.key});
@@ -13,20 +17,101 @@ class PlaceholderProfilScreen extends StatefulWidget {
 }
 
 class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
-  // Data Diri Pemesan (Akan terupdate saat diedit)
-  String _fullName = 'Intan Nur Isnaini';
-  final String _email = 'intan@example.com'; // Email bawaan login
-  String _phone = '081234567890';
-  String _age = '21';
-  String _address = 'Yogyakarta, Indonesia';
-  String _gender = 'Perempuan';
+  final _supabase = Supabase.instance.client;
+  UserModel? _currentUserModel;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  // Mengambil data profil dari Supabase Auth & Tabel Profiles
+  Future<void> _loadUserData() async {
+    final user = _supabase.auth.currentUser;
+
+    if (user != null) {
+      try {
+        final data = await _supabase
+            .from('profiles')
+            .select()
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (data != null) {
+          setState(() {
+            _currentUserModel = UserModel.fromJson(data);
+          });
+        } else {
+          // Jika baris di database belum ada, inisialisasi dari akun Auth
+          setState(() {
+            _currentUserModel = UserModel(
+              id: user.id,
+              email: user.email ?? '',
+              fullName: user.userMetadata?['full_name'] ?? '',
+            );
+          });
+        }
+      } catch (e) {
+        debugPrint('Error memuat profil: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Menyimpan data profil yang diedit ke Supabase
+  Future<void> _updateUserData(UserModel updatedModel) async {
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    try {
+      final payload = {
+        'id': user.id,
+        'email': user.email,
+        ...updatedModel.toUpdateJson(),
+      };
+
+      await _supabase.from('profiles').upsert(payload);
+
+      setState(() {
+        _currentUserModel = updatedModel;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Data profil berhasil disimpan ke database!',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: const Color(0xFF1550B6),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan data: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   void _showEditProfileDialog() {
-    final nameController = TextEditingController(text: _fullName);
-    final phoneController = TextEditingController(text: _phone);
-    final ageController = TextEditingController(text: _age);
-    final addressController = TextEditingController(text: _address);
-    String selectedGender = _gender;
+    final model = _currentUserModel;
+    final nameController = TextEditingController(text: model?.fullName);
+    final phoneController = TextEditingController(text: model?.phone);
+    final ageController = TextEditingController(text: model?.age);
+    final addressController = TextEditingController(text: model?.address);
+    String? selectedGender = model?.gender;
 
     showModalBottomSheet(
       context: context,
@@ -115,7 +200,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     // Row Usia & Jenis Kelamin
                     Row(
                       children: [
-                        // Usia
                         Expanded(
                           child: TextField(
                             controller: ageController,
@@ -134,10 +218,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Jenis Kelamin
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: selectedGender,
+                            value: selectedGender,
                             style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
                             decoration: InputDecoration(
                               labelText: 'Gender',
@@ -153,12 +236,8 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                               DropdownMenuItem(value: 'Laki-laki', child: Text('Laki-laki')),
                               DropdownMenuItem(value: 'Perempuan', child: Text('Perempuan')),
                             ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setModalState(() {
-                                  selectedGender = value;
-                                });
-                              }
+                            onChanged: (val) {
+                              setModalState(() => selectedGender = val);
                             },
                           ),
                         ),
@@ -191,23 +270,18 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () {
-                          setState(() {
-                            _fullName = nameController.text.trim();
-                            _phone = phoneController.text.trim();
-                            _age = ageController.text.trim();
-                            _address = addressController.text.trim();
-                            _gender = selectedGender;
-                          });
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Data profil berhasil disimpan!',
-                                style: GoogleFonts.poppins(),
-                              ),
-                              backgroundColor: const Color(0xFF1550B6),
-                            ),
+                          final user = _supabase.auth.currentUser;
+                          final newModel = UserModel(
+                            id: user?.id ?? model?.id ?? '',
+                            email: user?.email ?? model?.email ?? '',
+                            fullName: nameController.text.trim(),
+                            phone: phoneController.text.trim(),
+                            age: ageController.text.trim(),
+                            gender: selectedGender,
+                            address: addressController.text.trim(),
                           );
+                          _updateUserData(newModel);
+                          Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1550B6),
@@ -238,6 +312,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
+    final user = _supabase.auth.currentUser;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
@@ -253,213 +328,277 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header Profil
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(28),
-                  bottomRight: Radius.circular(28),
-                ),
-              ),
-              padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: primaryColor),
+            )
+          : SingleChildScrollView(
               child: Column(
                 children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      const CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.white24,
-                        child: CircleAvatar(
-                          radius: 44,
-                          backgroundColor: Colors.white,
-                          child: Icon(
-                            Icons.person,
-                            size: 50,
-                            color: primaryColor,
-                          ),
-                        ),
+                  // Header Profil
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(28),
+                        bottomRight: Radius.circular(28),
                       ),
-                      InkWell(
-                        onTap: _showEditProfileDialog,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
+                    ),
+                    padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
+                    child: Column(
+                      children: [
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            const CircleAvatar(
+                              radius: 48,
+                              backgroundColor: Colors.white24,
+                              child: CircleAvatar(
+                                radius: 44,
+                                backgroundColor: Colors.white,
+                                child: Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _showEditProfileDialog,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.edit,
+                                  size: 16,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Menampilkan Nama Lengkap
+                        Text(
+                          (_currentUserModel?.fullName != null && _currentUserModel!.fullName.isNotEmpty)
+                              ? _currentUserModel!.fullName
+                              : (user?.userMetadata?['full_name'] ?? 'Belum Diisi'),
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            size: 16,
-                            color: primaryColor,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _fullName,
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _email,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Fitur Utama & Tugas Intan
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Fitur Aplikasi',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Wisata Terdekat
-                  _buildMenuItem(
-                    icon: Icons.near_me_outlined,
-                    title: 'Wisata Terdekat (LBS)',
-                    subtitle: 'Peta & jarak lokasi wisata dari Anda',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LbsScreen(),
+                        const SizedBox(height: 4),
+                        // Menampilkan Email Secara Permanen
+                        Text(
+                          user?.email ?? (_currentUserModel?.email.isNotEmpty == true ? _currentUserModel!.email : 'Tidak ada email'),
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.white70,
+                          ),
                         ),
-                      );
-                    },
-                  ),
-
-                  // Game Tangkap Tiket
-                  _buildMenuItem(
-                    icon: Icons.sports_esports_outlined,
-                    title: 'Tangkap Tiket Wisata',
-                    subtitle: 'Mainkan game & dapatkan voucher diskon',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const QuizScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // Saran & Kesan PAM
-                  _buildMenuItem(
-                    icon: Icons.rate_review_outlined,
-                    title: 'Saran & Kesan PAM',
-                    subtitle: 'Masukan untuk mata kuliah PAM',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const FeedbackScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-                  Text(
-                    'Akun',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
 
-                  _buildMenuItem(
-                    icon: Icons.lock_outline,
-                    title: 'Keamanan & Biometrik',
-                    subtitle: 'Kelola akses masuk akun',
-                    onTap: () {},
-                  ),
-               _buildMenuItem(
-  icon: Icons.logout,
-  title: 'Keluar',
-  subtitle: 'Keluar dari akun LelunganJogja',
-  textColor: Colors.redAccent,
-  iconColor: Colors.redAccent,
-  onTap: () {
-    // 1. Tampilkan pop-up konfirmasi keluar
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Keluar Akun',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Apakah kamu yakin ingin keluar dari LelunganJogja?',
-          style: GoogleFonts.poppins(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Tutup dialog
-              
-              // Arahkan ke halaman login dan hapus riwayat halaman sebelumnya
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text('Keluar', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  },
-),
                   const SizedBox(height: 24),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Fitur Aplikasi',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Wisata Terdekat
+                        _buildMenuItem(
+                          icon: Icons.near_me_outlined,
+                          title: 'Wisata Terdekat (LBS)',
+                          subtitle: 'Peta & jarak lokasi wisata dari Anda',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LbsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Game Tangkap Tiket
+                        _buildMenuItem(
+                          icon: Icons.sports_esports_outlined,
+                          title: 'Tangkap Tiket Wisata',
+                          subtitle: 'Mainkan game & dapatkan voucher diskon',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const QuizScreen(),
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Saran & Kesan PAM
+                        _buildMenuItem(
+                          icon: Icons.rate_review_outlined,
+                          title: 'Saran & Kesan PAM',
+                          subtitle: 'Masukan untuk mata kuliah PAM',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const FeedbackScreen(),
+                              ),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 20),
+                        Text(
+                          'Akun',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Menu Keamanan & Biometrik
+                        _buildMenuItem(
+                          icon: Icons.lock_outline,
+                          title: 'Keamanan & Biometrik',
+                          subtitle: 'Kelola akses masuk akun',
+                          onTap: () async {
+                            final LocalAuthentication auth = LocalAuthentication();
+
+                            try {
+                              bool canCheckBiometrics = await auth.canCheckBiometrics;
+                              bool isDeviceSupported = await auth.isDeviceSupported();
+
+                              if (!canCheckBiometrics && !isDeviceSupported) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Perangkat tidak mendukung fitur biometrik'),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+
+                              bool authenticated = await auth.authenticate(
+                                localizedReason: 'Pindai sidik jari/wajah untuk verifikasi akun',
+                                options: const AuthenticationOptions(
+                                  stickyAuth: true,
+                                  biometricOnly: true,
+                                ),
+                              );
+
+                              if (context.mounted) {
+                                if (authenticated) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Verifikasi Biometrik Berhasil!'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Verifikasi Biometrik Dibatalkan'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error Biometrik: $e'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+
+                        // Menu Keluar
+                        _buildMenuItem(
+                          icon: Icons.logout,
+                          title: 'Keluar',
+                          subtitle: 'Keluar dari akun LelunganJogja',
+                          textColor: Colors.redAccent,
+                          iconColor: Colors.redAccent,
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: Text(
+                                  'Keluar Akun',
+                                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                                ),
+                                content: Text(
+                                  'Apakah kamu yakin ingin keluar dari LelunganJogja?',
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text('Batal', style: GoogleFonts.poppins(color: Colors.grey)),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+                                      await _supabase.auth.signOut();
+                                      if (context.mounted) {
+                                        Navigator.pushAndRemoveUntil(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                          (route) => false,
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text('Keluar', style: GoogleFonts.poppins(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 

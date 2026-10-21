@@ -1,65 +1,66 @@
 class UserModel {
   final String id;
   final String email;
-  final String namaLengkap;
-  final String noTelepon;
-  final int? usia;
-  final String jenisKelamin;
-  final String alamat;
+  final String fullName;
+  final String phone;
+  final String age;
+  final String address;
+  final String? gender; // Nullable agar tidak ter-hardcode ke Perempuan/Laki-laki
   final String? fotoUrl;
 
   const UserModel({
     required this.id,
     required this.email,
-    this.namaLengkap = '',
-    this.noTelepon = '',
-    this.usia,
-    this.jenisKelamin = 'Perempuan',
-    this.alamat = '',
+    this.fullName = '',
+    this.phone = '',
+    this.age = '',
+    this.address = '',
+    this.gender, // Mengizinkan null secara fleksibel
     this.fotoUrl,
   });
 
-  /// Dari baris tabel `users` di Supabase
+  /// Mengambil data dari baris tabel `profiles` di Supabase
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       email: json['email'] as String? ?? '',
-      namaLengkap: json['nama_lengkap'] as String? ?? '',
-      noTelepon: json['no_telepon'] as String? ?? '',
-      usia: json['usia'] as int?,
-      jenisKelamin: json['jenis_kelamin'] as String? ?? 'Perempuan',
-      alamat: json['alamat'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      age: json['age']?.toString() ?? '',
+      address: json['address'] as String? ?? '',
+      gender: json['gender'] as String?, // Murni dari database, tidak di-hardcode
       fotoUrl: json['foto_url'] as String?,
     );
   }
 
-  /// Hanya kolom yang boleh diubah pengguna (dipakai untuk update)
+  /// Format data yang dikirim untuk update/upsert ke Supabase
   Map<String, dynamic> toUpdateJson() {
     return {
-      'nama_lengkap': namaLengkap,
-      'no_telepon': noTelepon,
-      'usia': usia,
-      'jenis_kelamin': jenisKelamin,
-      'alamat': alamat,
+      'fullName': fullName,
+      'email': email,
+      'phone': phone,
+      'age': age,
+      'address': address,
+      'gender': gender,
     };
   }
 
   UserModel copyWith({
-    String? namaLengkap,
-    String? noTelepon,
-    int? usia,
-    String? jenisKelamin,
-    String? alamat,
+    String? fullName,
+    String? phone,
+    String? age,
+    String? address,
+    String? gender,
     String? fotoUrl,
   }) {
     return UserModel(
       id: id,
       email: email,
-      namaLengkap: namaLengkap ?? this.namaLengkap,
-      noTelepon: noTelepon ?? this.noTelepon,
-      usia: usia ?? this.usia,
-      jenisKelamin: jenisKelamin ?? this.jenisKelamin,
-      alamat: alamat ?? this.alamat,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      age: age ?? this.age,
+      address: address ?? this.address,
+      gender: gender ?? this.gender,
       fotoUrl: fotoUrl ?? this.fotoUrl,
     );
   }

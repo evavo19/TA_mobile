@@ -1,9 +1,9 @@
 import 'dart:convert';
-
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Ditambahkan untuk Backend Supabase
 
 import 'register_screen.dart';
 
@@ -18,9 +18,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final LocalAuthentication auth = LocalAuthentication();
+  final _supabase = Supabase.instance.client; // Inisialisasi Supabase
 
-  // Variable untuk kontrol visibilitas password
   bool _isObscure = true;
+  bool _isLoading = false; // Indicator loading saat proses login backend
 
   @override
   void dispose() {
@@ -29,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Helper Custom Pop-up Dialog
+  // Helper Custom Pop-up Dialog milik temanmu
   void _showCustomDialog({
     required String title,
     required String message,
@@ -56,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Ikon Lingkaran Khas UI Jogja Go
+                // Ikon Lingkaran
                 Container(
                   width: 68,
                   height: 68,
@@ -100,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Tombol Kapsul Sesuai Referensi UI
+                // Tombol Kapsul
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -144,7 +145,8 @@ class _LoginScreenState extends State<LoginScreen> {
     return digest.toString();
   }
 
-  void _handleLogin() {
+  // FUNGSI LOGIN DENGAN INTEGRASI SUPABASE BACKEND
+  Future<void> _handleLogin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text;
 
@@ -160,7 +162,44 @@ class _LoginScreenState extends State<LoginScreen> {
     String hashedPassword = _hashPassword(password);
     debugPrint("Password Terenkripsi (SHA-256): $hashedPassword");
 
-    Navigator.pushReplacementNamed(context, '/main');
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Verifikasi akun ke Supabase Auth
+      final response = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (mounted && response.user != null) {
+        _showCustomDialog(
+          title: 'Login Berhasil',
+          message: 'Selamat datang kembali di LelunganJogja!',
+          isSuccess: true,
+          onSuccessPressed: () {
+            Navigator.pushReplacementNamed(context, '/main');
+          },
+        );
+      }
+    } on AuthException catch (_) {
+      if (mounted) {
+        _showCustomDialog(
+          title: 'Gagal Masuk',
+          message: 'Email belum terdaftar atau password salah! Silakan daftar akun terlebih dahulu.',
+          isSuccess: false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showCustomDialog(
+          title: 'Terjadi Kesalahan',
+          message: 'Gagal menghubungkan ke server: $e',
+          isSuccess: false,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _handleBiometricLogin() async {
@@ -200,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header Atas (Warna Biru + Gambar Tugu Jogja Transparan)
+            // Header Atas
             Stack(
               children: [
                 Container(
@@ -308,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Field Password + Ikon Mata Toggle
+                  // Field Password
                   TextField(
                     controller: _passwordController,
                     obscureText: _isObscure,
@@ -358,15 +397,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 28),
 
-                  // Tombol Masuk + Sidik Jari Sampingan
+                  // Tombol Masuk + Sidik Jari
                   Row(
                     children: [
-                      // Tombol Masuk Utama
                       Expanded(
                         child: SizedBox(
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: _handleLogin,
+                            onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryColor,
                               elevation: 0,
@@ -374,20 +412,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(26),
                               ),
                             ),
-                            child: Text(
-                              'Masuk',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    'Masuk',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
 
-                      // Tombol Sidik Jari
                       InkWell(
                         onTap: _handleBiometricLogin,
                         borderRadius: BorderRadius.circular(26),

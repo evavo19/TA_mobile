@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/pesanan_model.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -12,72 +14,52 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
   @override
   void initState() {
     super.initState();
-    
-    if (widget.pesananBaru != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showTopNotificationBanner(
-          context,
-          'Pembayaran Berhasil',
-          'Tiket ${widget.pesananBaru!.namaWisata} sejumlah ${widget.pesananBaru!.jumlahTiket} orang berhasil dipesan.',
-        );
-      });
-    }
+    _initNotificationChannel();
   }
 
-  // Fungsi Pop-up muncul di ATAS layar
-  void _showTopNotificationBanner(BuildContext context, String title, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.notifications_rounded, color: Colors.white, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    message,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF1550B6),
-        behavior: SnackBarBehavior.floating,
-        // Kunci agar posisinya nempel di ATAS (menggunakan MediaQuery untuk melewati status bar)
-        margin: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 10,
-          left: 16,
-          right: 16,
-          bottom: MediaQuery.of(context).size.height - 180, // Mendorong posisi ke atas
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        duration: const Duration(seconds: 4),
-        elevation: 8,
-      ),
-    );
+  // Inisialisasi channel agar Android mengenali saluran notifikasi aplikasi
+  Future<void> _initNotificationChannel() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  // Fungsi saat tombol diklik untuk meminta izin notifikasi sistem
+  Future<void> _requestSystemNotificationPermission() async {
+    try {
+      debugPrint("Mencoba meminta izin notifikasi...");
+      
+      // Minta izin langsung ke sistem
+      PermissionStatus status = await Permission.notification.request();
+      debugPrint("Status izin saat ini: $status");
+
+      if (!mounted) return;
+
+      if (status.isGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Izin notifikasi berhasil diaktifkan!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // Jika ditolak atau diabaikan sistem, arahkan langsung ke setelan aplikasi HP
+        bool isOpened = await openAppSettings();
+        debugPrint("Membuka setelan aplikasi: $isOpened");
+      }
+    } catch (e) {
+      debugPrint("Error request permission: $e");
+    }
   }
 
   @override
@@ -132,82 +114,147 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
         centerTitle: true,
       ),
-      body: ListView.builder(
+      body: ListView(
         padding: const EdgeInsets.all(20),
-        itemCount: notifications.length,
-        itemBuilder: (context, index) {
-          final notif = notifications[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(20),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: (notif['color'] as Color).withAlpha(26),
-                    shape: BoxShape.circle,
+        children: [
+          // Tombol Interaktif untuk Meminta Izin Notifikasi Sistem
+          GestureDetector(
+            onTap: () {
+              debugPrint("Tombol izin diklik!");
+              _requestSystemNotificationPermission();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withAlpha(80),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
-                  child: Icon(
-                    notif['icon'],
-                    color: notif['color'],
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            notif['title'],
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: const Color(0xFF1E293B),
-                            ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications_active, color: Colors.white, size: 28),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Izinkan Notifikasi Sistem',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.white,
                           ),
-                          Text(
-                            notif['time'],
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        notif['message'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                          height: 1.4,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          'Ketuk untuk mengaktifkan izin pemberitahuan.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                ],
+              ),
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 24),
+
+          // Judul Riwayat Notifikasi
+          Text(
+            'Riwayat Notifikasi',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // List Daftar Notifikasi
+          ...notifications.map((notif) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: (notif['color'] as Color).withAlpha(26),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      notif['icon'],
+                      color: notif['color'],
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              notif['title'],
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              notif['time'],
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          notif['message'],
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

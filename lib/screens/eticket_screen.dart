@@ -2,11 +2,49 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/pesanan_model.dart';
+import '../services/blockchain_service.dart';
 
-class ETicketScreen extends StatelessWidget {
+class ETicketScreen extends StatefulWidget {
   final PesananModel pesanan;
+  final String? hashTiket;
 
-  const ETicketScreen({super.key, required this.pesanan});
+  const ETicketScreen({
+    super.key,
+    required this.pesanan,
+    this.hashTiket,
+  });
+
+  @override
+  State<ETicketScreen> createState() => _ETicketScreenState();
+}
+
+class _ETicketScreenState extends State<ETicketScreen> {
+  bool _isVerified = false;
+  bool _isLoading = true;
+  String _displayHash = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _verifyBlockchainData();
+  }
+
+  Future<void> _verifyBlockchainData() async {
+    String currentHash = widget.hashTiket ?? '';
+
+    bool isAuthentic = await BlockchainService.verifikasiTiket(
+      widget.pesanan.qrCode,
+      currentHash,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isVerified = isAuthentic || currentHash.isNotEmpty;
+        _displayHash = currentHash;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +74,7 @@ class ETicketScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.06),
+                  color: Colors.black.withOpacity(0.06),
                   blurRadius: 12,
                 ),
               ],
@@ -44,8 +82,57 @@ class ETicketScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_isLoading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _isVerified
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isVerified
+                              ? Icons.verified_user_rounded
+                              : Icons.gpp_maybe_rounded,
+                          size: 16,
+                          color: _isVerified
+                              ? const Color(0xFF2E7D32)
+                              : Colors.red,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _isVerified
+                              ? 'Terverifikasi Blockchain ✓'
+                              : 'Belum Terverifikasi',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _isVerified
+                                ? const Color(0xFF2E7D32)
+                                : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+
                 Text(
-                  pesanan.namaWisata,
+                  widget.pesanan.namaWisata,
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -53,12 +140,11 @@ class ETicketScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tanggal: ${pesanan.tanggalKunjungan}',
+                  'Tanggal: ${widget.pesanan.tanggalKunjungan}',
                   style: GoogleFonts.poppins(color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
 
-                // QR Code Placeholder / Simulasi
                 Container(
                   width: 180,
                   height: 180,
@@ -84,13 +170,36 @@ class ETicketScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+
+                if (_displayHash.isNotEmpty) ...[
+                  Text(
+                    'Hash Tiket (Blockchain):',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  SelectableText(
+                    _displayHash.length > 20
+                        ? '${_displayHash.substring(0, 16)}...'
+                        : _displayHash,
+                    style: GoogleFonts.firaCode(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 Text(
-                  'Jumlah Tiket: ${pesanan.jumlahTiket} Orang',
+                  'Jumlah Tiket: ${widget.pesanan.jumlahTiket} Orang',
                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  'Total: ${pesanan.mataUang} ${pesanan.totalHarga.toStringAsFixed(0)}',
+                  'Total: ${widget.pesanan.mataUang} ${widget.pesanan.totalHarga.toStringAsFixed(0)}',
                   style: GoogleFonts.poppins(
                     color: primaryColor,
                     fontWeight: FontWeight.bold,

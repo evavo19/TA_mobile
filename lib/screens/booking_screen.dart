@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../models/pesanan_model.dart';
 import '../models/wisata_model.dart';
 import '../screens/eticket_screen.dart';
+import '../services/blockchain_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final WisataModel wisata;
@@ -69,15 +69,16 @@ class _BookingScreenState extends State<BookingScreen> {
     return hargaKoin * _jumlahTiket;
   }
 
-  void _prosesPembayaran() {
+  Future<void> _prosesPembayaran() async {
     if (_selectedDate == null) return;
 
     String tanggalFormatted =
         '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
 
-    // Membuat instance PesananModel
+    final String qrCodeId = 'TIC-${DateTime.now().millisecondsSinceEpoch}';
+
     final pesanan = PesananModel(
-      userId: 'user_temp_id', // Nanti otomatis terisi dari Supabase Auth
+      userId: 'user_temp_id',
       wisataId: widget.wisata.id,
       namaWisata: widget.wisata.nama,
       tanggalKunjungan: tanggalFormatted,
@@ -86,14 +87,29 @@ class _BookingScreenState extends State<BookingScreen> {
       mataUang: widget.selectedCurrency,
       metodePembayaran: _selectedPayment,
       status: 'Lunas',
-      qrCode: 'TIC-${DateTime.now().millisecondsSinceEpoch}',
+      qrCode: qrCodeId,
       createdAt: DateTime.now(),
     );
 
-    _showSuccessDialog(pesanan);
+    String generatedHash = '';
+    try {
+      generatedHash = await BlockchainService.tambahBlok(
+        ticketId: pesanan.qrCode,
+        namaWisata: pesanan.namaWisata,
+        tanggalKunjungan: pesanan.tanggalKunjungan,
+        jumlahTiket: pesanan.jumlahTiket,
+        totalHarga: pesanan.totalHarga,
+      );
+    } catch (e) {
+      debugPrint("Gagal mencatat blok tiket: $e");
+    }
+
+    if (mounted) {
+      _showSuccessDialog(pesanan, generatedHash);
+    }
   }
 
-  void _showSuccessDialog(PesananModel pesanan) {
+  void _showSuccessDialog(PesananModel pesanan, String hashTiket) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -144,14 +160,16 @@ class _BookingScreenState extends State<BookingScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context); // Tutup dialog
-                    Navigator.pop(context); // Kembali dari booking screen
+                    Navigator.pop(context);
+                    Navigator.pop(context);
 
-                    // Pindah ke Halaman E-Tiket
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ETicketScreen(pesanan: pesanan),
+                        builder: (context) => ETicketScreen(
+                          pesanan: pesanan,
+                          hashTiket: hashTiket,
+                        ),
                       ),
                     );
                   },
@@ -213,7 +231,6 @@ class _BookingScreenState extends State<BookingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Card Info Wisata Ringkas
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -221,7 +238,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: Colors.black.withOpacity(0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -238,14 +255,14 @@ class _BookingScreenState extends State<BookingScreen> {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  width: 70,
-                                  height: 70,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(
-                                    Icons.broken_image_outlined,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey.shade200,
+                              child: const Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -280,7 +297,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Pilih Tanggal Kunjungan
                   Text(
                     'Tanggal Kunjungan',
                     style: GoogleFonts.poppins(
@@ -331,7 +347,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Jumlah Tiket
                   Text(
                     'Jumlah Tiket',
                     style: GoogleFonts.poppins(
@@ -387,7 +402,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Metode Pembayaran
                   Text(
                     'Metode Pembayaran',
                     style: GoogleFonts.poppins(
@@ -397,65 +411,62 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  RadioGroup<String>(
-                    groupValue: _selectedPayment,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedPayment = val);
-                      }
-                    },
-                    child: Column(
-                      children: _paymentMethods.map((method) {
-                        final isSelected = _selectedPayment == method['name'];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? primaryColor
-                                  : Colors.grey.shade300,
-                              width: isSelected ? 1.8 : 1,
+                  Column(
+                    children: _paymentMethods.map((method) {
+                      final isSelected = _selectedPayment == method['name'];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected
+                                ? primaryColor
+                                : Colors.grey.shade300,
+                            width: isSelected ? 1.8 : 1,
+                          ),
+                        ),
+                        child: RadioListTile<String>(
+                          activeColor: primaryColor,
+                          groupValue: _selectedPayment,
+                          value: method['name']!,
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _selectedPayment = val);
+                            }
+                          },
+                          title: Text(
+                            method['name']!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
-                          child: RadioListTile<String>(
-                            activeColor: primaryColor,
-                            title: Text(
-                              method['name']!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
+                          subtitle: Text(
+                            method['desc']!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.grey,
                             ),
-                            subtitle: Text(
-                              method['desc']!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            value: method['name']!,
                           ),
-                        );
-                      }).toList(),
-                    ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
             ),
           ),
 
-          // Bottom Bar Total & Bayar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
+                  color: Colors.black.withOpacity(0.06),
                   blurRadius: 10,
                   offset: const Offset(0, -4),
                 ),

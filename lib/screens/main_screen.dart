@@ -36,7 +36,9 @@ class _MainScreenState extends State<MainScreen> {
           totalHarga: 100000,
           mataUang: 'IDR',
           metodePembayaran: 'QRIS',
+          status: 'Lunas',              // <-- Tambahkan ini
           qrCode: 'TIC-DEMO-12345',
+          createdAt: DateTime.now(),    // <-- Tambahkan ini
         ),
       ),
 

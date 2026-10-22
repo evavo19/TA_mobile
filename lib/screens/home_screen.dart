@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/wisata_model.dart';
 import 'detail_wisata_screen.dart';
+import 'notifikasi_screen.dart'; // 👈 Import halaman notifikasi
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -65,6 +66,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontSize: 20,
                 ),
               ),
+              // 👇 Tombol Icon Notifikasi Ditambahkan di Sini
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                  tooltip: 'Notifikasi & Izin',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(70),
                 child: Container(
@@ -271,14 +288,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) =>
                                       Container(
-                                        height: 170,
-                                        color: Colors.grey.shade200,
-                                        child: const Icon(
-                                          Icons.broken_image_outlined,
-                                          size: 48,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
+                                    height: 170,
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 48,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                 ),
                               ),
                               Padding(

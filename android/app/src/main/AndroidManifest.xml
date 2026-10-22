@@ -35,10 +35,21 @@
             android:value="2" />
     </application>
 
+    <!-- 👇 TAMBAHKAN BLOK QUERIES INI AGAR URL_LAUNCHER BISA MEMBUKA MAPS & BROWSER DI HP -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Membuka link web / Google Maps -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- Membuka aplikasi Google Maps secara langsung jika terinstall -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
         </intent>
     </queries>
 </manifest>

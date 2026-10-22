@@ -44,7 +44,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
     }
   }
 
-  // FUNGSI UNTUK MENGAMBIL TIKET TERBARU DARI DATABASE
+  // FUNGSI UNTUK MENGAMBIL TIKET TERBARU BERDASARKAN USER YANG SEDANG LOGIN
   Future<void> _loadLatestTicket() async {
     setState(() => _isLoading = true);
     final ticket = await _fetchLatestTicket();
@@ -61,11 +61,17 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
   Future<PesananModel?> _fetchLatestTicket() async {
     final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    // Jika belum ada user yang login, kembalikan null
+    if (user == null) return null;
 
     try {
+      // Ambil pesanan HANYA milik user yang sedang login saat ini
       final response = await supabase
           .from('pesanan')
           .select()
+          .eq('user_id', user.id) // Kunci agar tiket tampil sesuai akun yang aktif
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -204,7 +210,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 const SizedBox(width: 6),
                                 Text(
                                   _isVerified
-                                      ? 'Terverifikasi Blockchain ✓'
+                                      ? 'Terverifikasi ✓'
                                       : 'Belum Terverifikasi',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,

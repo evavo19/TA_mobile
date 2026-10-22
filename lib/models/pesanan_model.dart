@@ -1,7 +1,7 @@
 class PesananModel {
   final int? id;
   final String userId;
-  final dynamic wisataId; // <-- Diubah menjadi dynamic agar bisa menerima int maupun String
+  final dynamic wisataId; // Bisa menerima int maupun String
   final String namaWisata;
   final String tanggalKunjungan;
   final int jumlahTiket;
@@ -49,7 +49,7 @@ class PesananModel {
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
-      'wisataId': wisataId, // Disimpan apa adanya
+      'wisata_id': wisataId, // Diperbaiki dari 'wisataId' menjadi 'wisata_id'
       'nama_wisata': namaWisata,
       'tanggal_kunjungan': tanggalKunjungan,
       'jumlah_tiket': jumlahTiket,

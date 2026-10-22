@@ -175,7 +175,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         _showCustomDialog(
           title: 'Gagal Masuk',
-          message: 'Email belum terdaftar atau password salah! Silakan periksa kembali atau daftar akun terlebih dahulu.',
+          message:
+              'Email belum terdaftar atau password salah! Silakan periksa kembali atau daftar akun terlebih dahulu.',
           isSuccess: false,
         );
       }
@@ -213,7 +214,21 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (authenticated && mounted) {
-        Navigator.pushReplacementNamed(context, '/main');
+        // Cek apakah ada sesi login aktif yang tersimpan dari Supabase
+        final session = _supabase.auth.currentSession;
+
+        if (session != null) {
+          // Jika pengguna pernah login sebelumnya, langsung meluncur ke /main
+          Navigator.pushReplacementNamed(context, '/main');
+        } else {
+          // Jika belum pernah login sama sekali, tampilkan petunjuk dialog
+          _showCustomDialog(
+            title: 'Belum Ada Akun Aktif',
+            message:
+                'Silakan login manual menggunakan Email & Password terlebih dahulu untuk mengaktifkan fitur sidik jari.',
+            isSuccess: false,
+          );
+        }
       }
     } catch (e) {
       debugPrint("Error Biometric: $e");
@@ -294,7 +309,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             const SizedBox(height: 28),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
@@ -333,7 +347,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   TextField(
                     controller: _passwordController,
                     obscureText: _isObscure,
@@ -380,9 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 28),
-
                   Row(
                     children: [
                       Expanded(
@@ -418,7 +429,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-
                       InkWell(
                         onTap: _handleBiometricLogin,
                         borderRadius: BorderRadius.circular(26),
@@ -438,9 +448,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 32),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

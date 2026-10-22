@@ -44,24 +44,35 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
 
     if (user != null) {
       try {
-        final data = await _supabase
+        var data = await _supabase
             .from('profiles')
             .select()
             .eq('id', user.id)
             .maybeSingle();
 
+        if (data == null) {
+          final initialPayload = {
+            'id': user.id,
+            'email': user.email ?? '',
+            'full_name': user.userMetadata?['full_name'] ?? '',
+            'avatar_url': null,
+          };
+          await _supabase.from('profiles').upsert(initialPayload);
+
+          data = await _supabase
+              .from('profiles')
+              .select()
+              .eq('id', user.id)
+              .maybeSingle();
+        }
+
         if (data != null) {
+          final Map<String, dynamic> resultMap = Map<String, dynamic>.from(
+            data as Map,
+          );
           setState(() {
-            _currentUserModel = UserModel.fromJson(data);
-            _avatarUrl = data['avatar_url'];
-          });
-        } else {
-          setState(() {
-            _currentUserModel = UserModel(
-              id: user.id,
-              email: user.email ?? '',
-              fullName: user.userMetadata?['full_name'] ?? '',
-            );
+            _currentUserModel = UserModel.fromJson(resultMap);
+            _avatarUrl = resultMap['avatar_url'] as String?;
           });
         }
       } catch (e) {
@@ -82,7 +93,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       final fileName =
           '${user.id}_${DateTime.now().millisecondsSinceEpoch}.png';
 
-      // 1. Upload ke Storage Bucket 'avatars'
       await _supabase.storage
           .from('avatars')
           .uploadBinary(
@@ -94,15 +104,17 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
             ),
           );
 
-      // 2. Ambil URL Publik
       final String publicUrl = _supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
 
-      // 3. Simpan HANYA ID, Email, dan URL Avatar ke tabel profiles (Aman dari error kolom nama)
       final Map<String, dynamic> payload = {
         'id': user.id,
         'email': user.email ?? '',
+        'full_name':
+            _currentUserModel?.fullName ??
+            user.userMetadata?['full_name'] ??
+            'Pengguna',
         'avatar_url': publicUrl,
       };
 
@@ -661,82 +673,104 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
         return Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Kelola Sidik Jari: $currentName',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: editNameController,
-                decoration: InputDecoration(
-                  labelText: 'Nama Sidik Jari',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _fingerprints.removeAt(index);
-                        });
-                        Navigator.pop(sheetContext);
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        _showBiometricManageModal();
-                      },
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Hapus'),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1550B6),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _fingerprints[index] = editNameController.text.trim();
-                        });
-                        Navigator.pop(sheetContext);
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        _showBiometricManageModal();
-                      },
-                      icon: const Icon(Icons.check, color: Colors.white),
-                      label: const Text(
-                        'Simpan',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Kelola Sidik Jari: $currentName',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: editNameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Nama Sidik Jari',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _fingerprints.removeAt(index);
+                          });
+                          Navigator.pop(sheetContext);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          _showBiometricManageModal();
+                        },
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Hapus'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1550B6),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _fingerprints[index] = editNameController.text
+                                .trim();
+                          });
+                          Navigator.pop(sheetContext);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          _showBiometricManageModal();
+                        },
+                        icon: const Icon(Icons.check, color: Colors.white),
+                        label: const Text(
+                          'Simpan',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
           ),
         );
       },
@@ -1087,266 +1121,259 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       backgroundColor: const Color(0xFFF6F8FB),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: primaryColor))
-          : NestedScrollView(
-              headerSliverBuilder:
-                  (BuildContext context, bool innerBoxIsScrolled) {
-                    return <Widget>[
-                      SliverAppBar(
-                        expandedHeight: 220.0,
-                        floating: false,
-                        pinned: true,
-                        backgroundColor: primaryColor,
-                        elevation: 0,
-                        flexibleSpace: FlexibleSpaceBar(
-                          background: Container(
-                            decoration: const BoxDecoration(
-                              color: primaryColor,
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(28),
-                                bottomRight: Radius.circular(28),
+          : Column(
+              children: [
+                // 1. HEADER BIRU TETAP MENEMPEL DI ATAS (FIXED / PINNED)
+                Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(28),
+                      bottomRight: Radius.circular(28),
+                    ),
+                  ),
+                  padding: const EdgeInsets.only(
+                    top: 54,
+                    bottom: 24,
+                    left: 16,
+                    right: 16,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: _showImagePickerOptions,
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 40,
+                              backgroundColor: Colors.white24,
+                              child: CircleAvatar(
+                                radius: 36,
+                                backgroundColor: Colors.white,
+                                backgroundImage: _getProfileImage(),
+                                child: _getProfileImage() == null
+                                    ? const Icon(
+                                        Icons.person,
+                                        size: 42,
+                                        color: primaryColor,
+                                      )
+                                    : null,
                               ),
                             ),
-                            padding: const EdgeInsets.only(
-                              top: 48,
-                              bottom: 16,
-                              left: 16,
-                              right: 16,
+                            Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                size: 14,
+                                color: primaryColor,
+                              ),
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                GestureDetector(
-                                  onTap: _showImagePickerOptions,
-                                  child: Stack(
-                                    alignment: Alignment.bottomRight,
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 40,
-                                        backgroundColor: Colors.white24,
-                                        child: CircleAvatar(
-                                          radius: 36,
-                                          backgroundColor: Colors.white,
-                                          backgroundImage: _getProfileImage(),
-                                          child: _getProfileImage() == null
-                                              ? const Icon(
-                                                  Icons.person,
-                                                  size: 42,
-                                                  color: primaryColor,
-                                                )
-                                              : null,
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.all(5),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.white,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.camera_alt,
-                                          size: 14,
-                                          color: primaryColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        (_currentUserModel?.fullName != null &&
-                                                _currentUserModel!
-                                                    .fullName
-                                                    .isNotEmpty)
-                                            ? _currentUserModel!.fullName
-                                            : (user?.userMetadata?['full_name'] ??
-                                                  'Belum Diisi'),
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    InkWell(
-                                      onTap: _showEditProfileDialog,
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(4.0),
-                                        child: Icon(
-                                          Icons.edit,
-                                          size: 16,
-                                          color: Colors.white70,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  user?.email ??
-                                      (_currentUserModel?.email.isNotEmpty ==
-                                              true
-                                          ? _currentUserModel!.email
-                                          : 'Tidak ada email'),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
                       ),
-                    ];
-                  },
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 20,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Fitur Aplikasi',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildMenuItem(
-                      icon: Icons.near_me_outlined,
-                      title: 'Wisata Terdekat (LBS)',
-                      subtitle: 'Peta & jarak lokasi wisata dari Anda',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LbsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildMenuItem(
-                      icon: Icons.sports_esports_outlined,
-                      title: 'Tangkap Tiket Wisata',
-                      subtitle: 'Mainkan game & dapatkan voucher diskon',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const QuizScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildMenuItem(
-                      icon: Icons.rate_review_outlined,
-                      title: 'Saran & Kesan PAM',
-                      subtitle: 'Masukan untuk mata kuliah PAM',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FeedbackScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Akun & Keamanan',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildMenuItem(
-                      icon: Icons.security_outlined,
-                      title: 'Keamanan & Biometrik',
-                      subtitle: 'Kelola & hapus akses sidik jari/wajah',
-                      onTap: _showBiometricManageModal,
-                    ),
-                    _buildMenuItem(
-                      icon: Icons.logout,
-                      title: 'Keluar',
-                      subtitle: 'Keluar dari akun LelunganJogja',
-                      textColor: Colors.redAccent,
-                      iconColor: Colors.redAccent,
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (dialogContext) => AlertDialog(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            title: Text(
-                              'Keluar Akun',
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              (_currentUserModel?.fullName != null &&
+                                      _currentUserModel!.fullName.isNotEmpty)
+                                  ? _currentUserModel!.fullName
+                                  : (user?.userMetadata?['full_name'] ??
+                                        'Belum Diisi'),
+                              textAlign: TextAlign.center,
                               style: GoogleFonts.poppins(
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
-                            content: Text(
-                              'Apakah kamu yakin ingin keluar dari LelunganJogja?',
-                              style: GoogleFonts.poppins(fontSize: 13),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: Text(
-                                  'Batal',
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  final navigator = Navigator.of(context);
-                                  Navigator.pop(dialogContext);
-                                  await _supabase.auth.signOut();
-                                  if (!mounted) return;
-                                  navigator.pushAndRemoveUntil(
-                                    MaterialPageRoute(
-                                      builder: (context) => const LoginScreen(),
-                                    ),
-                                    (route) => false,
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.redAccent,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Keluar',
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 32),
-                  ],
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: _showEditProfileDialog,
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.edit,
+                                size: 16,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        user?.email ??
+                            (_currentUserModel?.email.isNotEmpty == true
+                                ? _currentUserModel!.email
+                                : 'Tidak ada email'),
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+
+                // 2. BAGIAN BAWAH YANG BISA DI-SCROLL
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Fitur Aplikasi',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _buildMenuItem(
+                          icon: Icons.near_me_outlined,
+                          title: 'Wisata Terdekat (LBS)',
+                          subtitle: 'Peta & jarak lokasi wisata dari Anda',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LbsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildMenuItem(
+                          icon: Icons.sports_esports_outlined,
+                          title: 'Tangkap Tiket Wisata',
+                          subtitle: 'Mainkan game & dapatkan voucher diskon',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const QuizScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildMenuItem(
+                          icon: Icons.rate_review_outlined,
+                          title: 'Saran & Kesan PAM',
+                          subtitle: 'Masukan untuk mata kuliah PAM',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const FeedbackScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Akun & Keamanan',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _buildMenuItem(
+                          icon: Icons.security_outlined,
+                          title: 'Keamanan & Biometrik',
+                          subtitle: 'Kelola & hapus akses sidik jari/wajah',
+                          onTap: _showBiometricManageModal,
+                        ),
+                        _buildMenuItem(
+                          icon: Icons.logout,
+                          title: 'Keluar',
+                          subtitle: 'Keluar dari akun LelunganJogja',
+                          textColor: Colors.redAccent,
+                          iconColor: Colors.redAccent,
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                title: Text(
+                                  'Keluar Akun',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                content: Text(
+                                  'Apakah kamu yakin ingin keluar dari LelunganJogja?',
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogContext),
+                                    child: Text(
+                                      'Batal',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      final navigator = Navigator.of(context);
+                                      Navigator.pop(dialogContext);
+                                      await _supabase.auth.signOut();
+                                      if (!mounted) return;
+                                      navigator.pushAndRemoveUntil(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const LoginScreen(),
+                                        ),
+                                        (route) => false,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Keluar',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }

@@ -300,35 +300,35 @@ Instruksi untuk AI:
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
         automaticallyImplyLeading: false, // Tanpa panah back
-        title: Align(
-          alignment: Alignment.centerLeft, // Teks rata kiri
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Asisten AI Wisata',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+        centerTitle: true, // 👈 Judul diposisikan di tengah
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.center, // 👈 Konten di dalam title di-center
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Asisten AI Wisata',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 16,
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.location_on, size: 11, color: Colors.white70),
-                  const SizedBox(width: 4),
-                  Text(
-                    _currentLocationName,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: Colors.white70,
-                    ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center, // 👈 Baris lokasi di-center
+              children: [
+                const Icon(Icons.location_on, size: 11, color: Colors.white70),
+                const SizedBox(width: 4),
+                Text(
+                  _currentLocationName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: Colors.white70,
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
         backgroundColor: primaryColor,
         elevation: 0,
@@ -632,6 +632,9 @@ Instruksi untuk AI:
           ),
         ),
         backgroundColor: Colors.white,
+// SKILL: /system:skill-creator
+// SKILL: /system:skill-updater
+// SKILL: /system:wellness_coach
         side: const BorderSide(color: Color(0xFF1550B6), width: 1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),

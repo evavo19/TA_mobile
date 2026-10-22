@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../features/chatbot.dart';
-import '../features/kompas.dart'; // 👈 Import halaman kompas yang baru
+import '../features/kompas.dart';
 import 'eticket_screen.dart';
 import 'home_screen.dart';
-import 'notifikasi_screen.dart'; // 👈 Import halaman notifikasi
 import 'profil_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -18,19 +17,20 @@ class _MainScreenState extends State<MainScreen> {
 
   late final List<Widget> _pages;
 
+  static const double _notchMargin = 8.0;
+  static const double _fabDiameter = 56.0;
+  static const double _fabDropOffset = 10.0; // makin besar, makin turun
+
   @override
   void initState() {
     super.initState();
     _pages = [
       // Tab 0: Beranda
       const HomeScreen(),
-
       // Tab 1: Tiket Saya
       const ETicketScreen(),
-
       // Tab 2: Asisten AI
       const ChatbotScreen(),
-
       // Tab 3: Profil
       const PlaceholderProfilScreen(),
     ];
@@ -41,12 +41,12 @@ class _MainScreenState extends State<MainScreen> {
     const primaryColor = Color(0xFF1550B6);
 
     return Scaffold(
-      // Menggunakan IndexedStack agar state halaman tidak hilang saat pindah menu
+      // IndexedStack agar state halaman tidak hilang saat pindah menu
       body: IndexedStack(index: _index, children: _pages),
 
-      // Tombol Kompas Melayang di Tengah (Diturunkan dan diberi bayangan agar menyatu rapi)
+      // Tombol Kompas (diturunkan sebesar _fabDropOffset)
       floatingActionButton: Transform.translate(
-        offset: const Offset(0, 16), // 👈 Menurunkan posisi tombol agar pas duduk di dalam mangkuk
+        offset: const Offset(0, _fabDropOffset),
         child: Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
@@ -62,13 +62,11 @@ class _MainScreenState extends State<MainScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const CompassScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const CompassScreen()),
               );
             },
             backgroundColor: primaryColor,
-            elevation: 0, // Dimatikan karena sudah di-handle oleh Container shadow
+            elevation: 0,
             shape: const CircleBorder(),
             child: const Icon(
               Icons.explore_outlined,
@@ -80,56 +78,52 @@ class _MainScreenState extends State<MainScreen> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-    // Bottom Navigation Bar dengan Lengkungan Mangkuk yang Jelas
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        color: Colors.white,
-        elevation: 12,
-        child: SizedBox(
-          height: 60,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Garis batas atas dengan efek bayangan lembut agar terangkat
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 1,
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(30),
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Menu Navigasi Bawah
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(Icons.home_rounded, 'Beranda', 0, primaryColor),
-                  _buildNavItem(Icons.confirmation_number_rounded, 'Tiket Saya', 1, primaryColor),
-                  const SizedBox(width: 48), // Spasi tengah untuk kompas
-                  _buildNavItem(Icons.smart_toy_rounded, 'Asisten AI', 2, primaryColor),
-                  _buildNavItem(Icons.person_rounded, 'Profil', 3, primaryColor),
-                ],
-              ),
-            ],
+      // Bottom bar: bayangan + isi putih digambar di belakang,
+      // garis border digambar di depan. Semua memakai satu path lekukan.
+      bottomNavigationBar: CustomPaint(
+        painter: _NotchedBarPainter(
+          notchMargin: _notchMargin,
+          fabDiameter: _fabDiameter,
+          fabDropOffset: _fabDropOffset,
+          borderColor: Colors.grey.shade300,
+          shadowColor: Colors.black.withAlpha(40),
+          drawBorder: false,
+        ),
+        foregroundPainter: _NotchedBarPainter(
+          notchMargin: _notchMargin,
+          fabDiameter: _fabDiameter,
+          fabDropOffset: _fabDropOffset,
+          borderColor: Colors.grey.shade300,
+          shadowColor: Colors.black.withAlpha(40),
+          drawBorder: true,
+        ),
+        child: BottomAppBar(
+          shape: null, // bentuk lekukan ditangani painter
+          color: Colors.transparent,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          padding: EdgeInsets.zero,
+          child: SizedBox(
+            height: 54,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home_rounded, 'Beranda', 0, primaryColor),
+                _buildNavItem(Icons.confirmation_number_rounded, 'Tiket Saya', 1, primaryColor),
+                const SizedBox(width: 48), // Spasi tengah untuk tombol kompas
+                _buildNavItem(Icons.smart_toy_rounded, 'Asisten AI', 2, primaryColor),
+                _buildNavItem(Icons.person_rounded, 'Profil', 3, primaryColor),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Widget helper custom untuk item BottomAppBar supaya sejajar dengan Notch
+  // Item navigasi custom supaya sejajar dengan notch
   Widget _buildNavItem(IconData icon, String label, int index, Color primaryColor) {
-    bool isSelected = _index == index;
+    final isSelected = _index == index;
 
     return InkWell(
       onTap: () => setState(() => _index = index),
@@ -158,4 +152,63 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+}
+
+/// Menggambar bentuk bar dengan lekukan: bayangan + isi putih (di belakang)
+/// atau garis border tipis (di depan).
+class _NotchedBarPainter extends CustomPainter {
+  final double notchMargin;
+  final double fabDiameter;
+  final double fabDropOffset;
+  final Color borderColor;
+  final Color shadowColor;
+  final bool drawBorder;
+
+  _NotchedBarPainter({
+    required this.notchMargin,
+    required this.fabDiameter,
+    required this.fabDropOffset,
+    required this.borderColor,
+    required this.shadowColor,
+    required this.drawBorder,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Pusat FAB digeser turun sesuai offset
+    final fabRect = Rect.fromCenter(
+      center: Offset(size.width / 2, fabDropOffset),
+      width: fabDiameter,
+      height: fabDiameter,
+    );
+
+    final path = const CircularNotchedRectangle().getOuterPath(
+      Offset.zero & size,
+      fabRect.inflate(notchMargin),
+    );
+
+    if (drawBorder) {
+      // Garis border tipis mengikuti lekukan
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = borderColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0,
+      );
+    } else {
+      // Bayangan lembut ke atas, lalu isi bar putih mengikuti lekukan
+      canvas.drawShadow(path, shadowColor, 6, false);
+      canvas.drawPath(path, Paint()..color = Colors.white);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NotchedBarPainter old) =>
+      old.borderColor != borderColor ||
+      old.shadowColor != shadowColor ||
+      old.notchMargin != notchMargin ||
+      old.fabDiameter != fabDiameter ||
+      old.fabDropOffset != fabDropOffset ||
+      old.drawBorder != drawBorder;
 }

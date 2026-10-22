@@ -39,21 +39,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
     try {
       debugPrint("Mencoba meminta izin notifikasi...");
       
-      // Minta izin langsung ke sistem
       PermissionStatus status = await Permission.notification.request();
       debugPrint("Status izin saat ini: $status");
 
       if (!mounted) return;
 
       if (status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Izin notifikasi berhasil diaktifkan!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        debugPrint("Izin notifikasi aktif");
       } else {
-        // Jika ditolak atau diabaikan sistem, arahkan langsung ke setelan aplikasi HP
         bool isOpened = await openAppSettings();
         debugPrint("Membuka setelan aplikasi: $isOpened");
       }
@@ -68,6 +61,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     final List<Map<String, dynamic>> notifications = [];
 
+    // Jika ada data pesanan baru dari pembayaran, masukkan ke list paling atas
     if (widget.pesananBaru != null) {
       notifications.add({
         'title': 'Pembayaran Berhasil',
@@ -78,20 +72,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
       });
     }
 
+    // Riwayat notifikasi default (Pengingat kunjungan sudah dihapus sesuai permintaan)
     notifications.addAll([
       {
         'title': 'Promo Spesial Yogyakarta',
         'message': 'Gunakan kode promo khusus untuk potongan harga pada kunjungan wisata berikutnya.',
-        'time': '2 jam yang lalu',
+        'time': '2 jam lalu',
         'icon': Icons.local_offer_rounded,
         'color': Colors.amber.shade700,
-      },
-      {
-        'title': 'Pengingat Kunjungan',
-        'message': 'Pastikan e-tiket sudah siap discan saat tiba di lokasi pintu masuk wisata.',
-        'time': 'Kemarin',
-        'icon': Icons.notifications_active_rounded,
-        'color': primaryColor,
       },
     ]);
 
@@ -221,14 +209,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              notif['title'],
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: const Color(0xFF1E293B),
+                            // 👇 DIBUNGKUS EXPANDED AGAR AMAN DARI ERROR PIXEL KUNING-HITAM (OVERFLOW)
+                            Expanded(
+                              child: Text(
+                                notif['title'],
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: const Color(0xFF1E293B),
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               notif['time'],
                               style: GoogleFonts.poppins(

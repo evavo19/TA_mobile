@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/pesanan_model.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -14,31 +13,14 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  @override
-  void initState() {
-    super.initState();
-    _initNotificationChannel();
-  }
-
-  // Inisialisasi channel agar Android mengenali saluran notifikasi aplikasi
-  Future<void> _initNotificationChannel() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
+  // Inisialisasi plugin notifikasi sudah dipindah ke NotificationService
+  // (dipanggil di main.dart), jadi tidak perlu lagi di halaman ini.
 
   // Fungsi saat tombol diklik untuk meminta izin notifikasi sistem
   Future<void> _requestSystemNotificationPermission() async {
     try {
       debugPrint("Mencoba meminta izin notifikasi...");
-      
+
       PermissionStatus status = await Permission.notification.request();
       debugPrint("Status izin saat ini: $status");
 
@@ -65,22 +47,31 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (widget.pesananBaru != null) {
       notifications.add({
         'title': 'Pembayaran Berhasil',
-        'message': 'Tiket wisata ${widget.pesananBaru!.namaWisata} (${widget.pesananBaru!.jumlahTiket} Orang) untuk tanggal ${widget.pesananBaru!.tanggalKunjungan} telah dikonfirmasi.',
+        'message':
+            'Tiket wisata ${widget.pesananBaru!.namaWisata} (${widget.pesananBaru!.jumlahTiket} Orang) untuk tanggal ${widget.pesananBaru!.tanggalKunjungan} telah dikonfirmasi.',
         'time': 'Baru saja',
         'icon': Icons.check_circle_rounded,
         'color': Colors.green,
       });
     }
 
-    // Riwayat notifikasi default (Pengingat kunjungan sudah dihapus sesuai permintaan)
+    // Riwayat notifikasi default
     notifications.addAll([
       {
         'title': 'Promo Spesial Yogyakarta',
-        'message': 'Gunakan kode promo khusus untuk potongan harga pada kunjungan wisata berikutnya.',
+        'message':
+            'Gunakan kode promo khusus untuk potongan harga pada kunjungan wisata berikutnya.',
         'time': '2 jam lalu',
         'icon': Icons.local_offer_rounded,
         'color': Colors.amber.shade700,
       },
+       {
+    'title': 'Tips Berkunjung di Akhir Pekan',
+    'message': 'Akhir pekan biasanya lebih ramai. Datang lebih pagi agar lebih nyaman menikmati wisata.',
+    'time': '2 hari lalu',
+    'icon': Icons.lightbulb_rounded,
+    'color': Colors.deepPurple,
+  },
     ]);
 
     return Scaffold(
@@ -209,7 +200,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // 👇 DIBUNGKUS EXPANDED AGAR AMAN DARI ERROR PIXEL KUNING-HITAM (OVERFLOW)
+                            // Dibungkus Expanded agar aman dari overflow
                             Expanded(
                               child: Text(
                                 notif['title'],

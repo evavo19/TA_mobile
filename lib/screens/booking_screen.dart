@@ -6,6 +6,7 @@ import '../models/pesanan_model.dart';
 import '../models/wisata_model.dart';
 import '../screens/eticket_screen.dart';
 import '../services/blockchain_service.dart';
+import '../services/notifikasi_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final WisataModel wisata;
@@ -36,6 +37,14 @@ class _BookingScreenState extends State<BookingScreen> {
     {'name': 'Transfer Bank (BCA/Mandiri)', 'desc': 'Virtual Account Bank'},
     {'name': 'E-Wallet (Gopay/OVO)', 'desc': 'Pembayaran dompet digital'},
   ];
+
+  @override
+  void dispose() {
+    // Pastikan banner overlay tidak tertinggal saat halaman ditutup
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    super.dispose();
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -72,6 +81,7 @@ class _BookingScreenState extends State<BookingScreen> {
     return hargaKoin * _jumlahTiket;
   }
 
+  // Banner notifikasi di dalam aplikasi (bukan notifikasi sistem Android)
   void _showTopNotification(String title, String message) {
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -188,8 +198,16 @@ class _BookingScreenState extends State<BookingScreen> {
       debugPrint("Gagal memproses pembayaran / blockchain: $e");
     }
 
+    // Notifikasi sistem Android (status bar & laci notifikasi).
+    // Dipanggil di luar `mounted` supaya tetap terkirim walau halaman ditutup.
+    NotificationService.show(
+      title: 'Pembayaran Berhasil',
+      body:
+          'Tiket ${pesanan.namaWisata} (${pesanan.jumlahTiket} orang) untuk tanggal ${pesanan.tanggalKunjungan} sudah dikonfirmasi.',
+    );
+
     if (mounted) {
-      // Tampilkan notifikasi di paling atas layar
+      // Banner di dalam aplikasi (paling atas layar)
       _showTopNotification(
         'Pembayaran Berhasil',
         'Tiket ${pesanan.namaWisata} berhasil dipesan!',

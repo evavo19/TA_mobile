@@ -30,6 +30,7 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime? _selectedDate;
   int _jumlahTiket = 1;
   String _selectedPayment = 'QRIS';
+  bool _isLoading = false;
   OverlayEntry? _overlayEntry;
 
   final List<Map<String, String>> _paymentMethods = [
@@ -143,7 +144,9 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _prosesPembayaran() async {
-    if (_selectedDate == null) return;
+    if (_selectedDate == null || _isLoading) return;
+
+    setState(() => _isLoading = true);
 
     String tanggalFormatted =
         '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
@@ -178,28 +181,15 @@ class _BookingScreenState extends State<BookingScreen> {
         totalHarga: pesanan.totalHarga,
       );
 
-      // 3. Simpan ke tabel 'pesanan' di Database Supabase
-      final pesananData = {
-        'user_id': user != null ? user.id : null,
-        'wisata_id': widget.wisata.id,
-        'nama_wisata': widget.wisata.nama,
-        'tanggal_kunjungan': tanggalFormatted,
-        'jumlah_tiket': _jumlahTiket,
-        'total_harga': _calculateTotalPrice(),
-        'mata_uang': widget.selectedCurrency,
-        'metode_pembayaran': _selectedPayment,
-        'status': 'Lunas',
-        'qr_code': qrCodeId,
-        'created_at': DateTime.now().toIso8601String(),
-      };
-
-      await supabase.from('pesanan').insert(pesananData);
+      // 3. Simpan ke tabel 'pesanan' di Database Supabase menggunakan toMap()
+      await supabase.from('pesanan').insert(pesanan.toMap());
     } catch (e) {
       debugPrint("Gagal memproses pembayaran / blockchain: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
 
-    // Notifikasi sistem Android (status bar & laci notifikasi).
-    // Dipanggil di luar `mounted` supaya tetap terkirim walau halaman ditutup.
+    // Notifikasi sistem Android (status bar & laci notifikasi)
     NotificationService.show(
       title: 'Pembayaran Berhasil',
       body:
@@ -536,7 +526,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     height: 48,
                     width: 160,
                     child: ElevatedButton(
-                      onPressed: _selectedDate == null
+                      onPressed: (_selectedDate == null || _isLoading)
                           ? null
                           : _prosesPembayaran,
                       style: ElevatedButton.styleFrom(
@@ -546,14 +536,23 @@ class _BookingScreenState extends State<BookingScreen> {
                           borderRadius: BorderRadius.circular(24),
                         ),
                       ),
-                      child: Text(
-                        'Bayar Sekarang',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              'Bayar Sekarang',
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],

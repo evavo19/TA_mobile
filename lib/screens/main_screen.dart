@@ -42,6 +42,9 @@ class _MainScreenState extends State<MainScreen> {
     const primaryColor = Color(0xFF1550B6);
 
     return Scaffold(
+      // Mencegah konten dan FAB ikut terdorong ke atas saat keyboard HP muncul
+      resizeToAvoidBottomInset: false,
+
       // IndexedStack agar state halaman tidak hilang saat pindah menu
       body: IndexedStack(index: _index, children: _pages),
 

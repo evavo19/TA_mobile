@@ -30,13 +30,34 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
   String? _avatarUrl;
   final ImagePicker _picker = ImagePicker();
 
-  final List<String> _fingerprints = [];
+  List<Map<String, dynamic>> _fingerprints = [];
   final LocalAuthentication _auth = LocalAuthentication();
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadFingerprints();
+  }
+
+  Future<void> _loadFingerprints() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final response = await _supabase
+          .from('user_fingerprints')
+          .select()
+          .eq('user_id', user.id);
+
+      if (mounted) {
+        setState(() {
+          _fingerprints = List<Map<String, dynamic>>.from(response);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error memuat sidik jari: $e');
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -129,7 +150,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Foto profil berhasil tersimpan di database!',
+              'Foto profil berhasil tersimpan',
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: const Color(0xFF1550B6),
@@ -507,7 +528,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         color: Colors.grey.shade700,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Email (Permanen)',
+                        labelText: 'Email',
                         prefixIcon: const Icon(
                           Icons.email_outlined,
                           color: Colors.grey,
@@ -610,7 +631,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                       maxLines: 2,
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
-                        labelText: 'Alamat Tempat Tinggal',
+                        labelText: 'Alamat',
                         prefixIcon: const Icon(
                           Icons.home_outlined,
                           color: Color(0xFF1550B6),
@@ -729,10 +750,18 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           side: const BorderSide(color: Colors.red),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _fingerprints.removeAt(index);
-                          });
+                        onPressed: () async {
+                          final fpId = _fingerprints[index]['id'];
+                          try {
+                            await _supabase
+                                .from('user_fingerprints')
+                                .delete()
+                                .eq('id', fpId);
+                            await _loadFingerprints();
+                          } catch (e) {
+                            debugPrint('Gagal menghapus sidik jari: $e');
+                          }
+
                           Navigator.pop(sheetContext);
                           if (!mounted) return;
                           Navigator.pop(context);
@@ -749,11 +778,20 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           backgroundColor: const Color(0xFF1550B6),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _fingerprints[index] = editNameController.text
-                                .trim();
-                          });
+                        onPressed: () async {
+                          final fpId = _fingerprints[index]['id'];
+                          final updatedName = editNameController.text.trim();
+
+                          try {
+                            await _supabase
+                                .from('user_fingerprints')
+                                .update({'name': updatedName})
+                                .eq('id', fpId);
+                            await _loadFingerprints();
+                          } catch (e) {
+                            debugPrint('Gagal memperbarui nama sidik jari: $e');
+                          }
+
                           Navigator.pop(sheetContext);
                           if (!mounted) return;
                           Navigator.pop(context);
@@ -912,7 +950,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Letakkan jari Anda di atas sensor\ndan angkat setelah merasakan getaran',
+                            'Letakkan jari Anda di atas sensor sidik jari perangkat Anda untuk mendaftarkan sidik jari',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
                               color: Colors.grey.shade600,
@@ -936,11 +974,24 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                               }
 
                               if (authenticated) {
-                                setState(() {
-                                  _fingerprints.add(
-                                    'Sidik Jari ${_fingerprints.length + 1}',
-                                  );
-                                });
+                                final user = _supabase.auth.currentUser;
+                                if (user != null) {
+                                  String newFpName =
+                                      'Sidik Jari ${_fingerprints.length + 1}';
+                                  try {
+                                    await _supabase
+                                        .from('user_fingerprints')
+                                        .insert({
+                                          'user_id': user.id,
+                                          'name': newFpName,
+                                        });
+                                    await _loadFingerprints();
+                                  } catch (e) {
+                                    debugPrint(
+                                      'Gagal menyimpan sidik jari: $e',
+                                    );
+                                  }
+                                }
 
                                 if (!sheetContext.mounted) return;
                                 Navigator.pop(sheetContext);
@@ -952,7 +1003,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Sidik jari berhasil didaftarkan!',
+                                      'Sidik jari berhasil didaftarkan dan disimpan!',
                                       style: GoogleFonts.poppins(),
                                     ),
                                     backgroundColor: const Color(0xFF1550B6),
@@ -1000,6 +1051,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
   void _showBiometricManageModal() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1007,94 +1059,123 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(10),
+            return DraggableScrollableSheet(
+              initialChildSize: 0.5,
+              minChildSize: 0.3,
+              maxChildSize: 0.85,
+              expand: false,
+              builder: (context, scrollController) {
+                return SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Kelola Keamanan Biometrik',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1550B6),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_fingerprints.isNotEmpty) ...[
-                    ..._fingerprints.asMap().entries.map((entry) {
-                      int idx = entry.key;
-                      String fpName = entry.value;
+                      const SizedBox(height: 16),
+                      Text(
+                        'Kelola Keamanan Biometrik',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1550B6),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (_fingerprints.isNotEmpty) ...[
+                        ..._fingerprints.asMap().entries.map((entry) {
+                          int idx = entry.key;
+                          String fpName = entry.value['name'] ?? 'Sidik Jari';
 
-                      return Column(
-                        children: [
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
-                              Icons.fingerprint,
-                              color: Color(0xFF1550B6),
-                            ),
-                            title: Text(
-                              fpName,
+                          return Column(
+                            children: [
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(
+                                  Icons.fingerprint,
+                                  color: Color(0xFF1550B6),
+                                ),
+                                title: Text(
+                                  fpName,
+                                  style: GoogleFonts.poppins(
+                                    color: const Color(0xFF1A1A1A),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                trailing: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.grey,
+                                ),
+                                onTap: () {
+                                  _showFingerprintOptions(idx, fpName);
+                                },
+                              ),
+                              const Divider(height: 1),
+                            ],
+                          );
+                        }),
+                        const SizedBox(height: 12),
+                      ] else ...[
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Text(
+                              'Belum ada sidik jari yang terdaftar.',
                               style: GoogleFonts.poppins(
-                                color: const Color(0xFF1A1A1A),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                                color: Colors.grey,
                               ),
                             ),
-                            trailing: const Icon(
-                              Icons.chevron_right,
-                              color: Colors.grey,
-                            ),
-                            onTap: () {
-                              _showFingerprintOptions(idx, fpName);
-                            },
                           ),
-                          const Divider(height: 1),
-                        ],
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                  ],
-                  InkWell(
-                    onTap: _openAddFingerprintFlow,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.add_circle_outline,
-                            color: Color(0xFF1550B6),
-                            size: 26,
+                        ),
+                      ],
+                      InkWell(
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          _openAddFingerprintFlow();
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.add_circle_outline,
+                                color: Color(0xFF1550B6),
+                                size: 26,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Tambahkan Sidik Jari',
+                                style: GoogleFonts.poppins(
+                                  color: const Color(0xFF1550B6),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Tambahkan Sidik Jari',
-                            style: GoogleFonts.poppins(
-                              color: const Color(0xFF1550B6),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           },
         );
@@ -1123,7 +1204,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
           ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : Column(
               children: [
-                // 1. HEADER BIRU TETAP MENEMPEL DI ATAS (FIXED / PINNED)
                 Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
@@ -1179,38 +1259,39 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              (_currentUserModel?.fullName != null &&
-                                      _currentUserModel!.fullName.isNotEmpty)
-                                  ? _currentUserModel!.fullName
-                                  : (user?.userMetadata?['full_name'] ??
-                                        'Belum Diisi'),
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                      Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                (_currentUserModel?.fullName != null &&
+                                        _currentUserModel!.fullName.isNotEmpty)
+                                    ? _currentUserModel!.fullName
+                                    : (user?.userMetadata?['full_name'] ??
+                                          'Belum Diisi'),
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: _showEditProfileDialog,
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(
-                                Icons.edit,
-                                size: 16,
-                                color: Colors.white70,
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: _showEditProfileDialog,
+                              child: const Padding(
+                                padding: EdgeInsets.all(4.0),
+                                child: Icon(
+                                  Icons.edit,
+                                  size: 16,
+                                  color: Colors.white70,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -1226,8 +1307,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     ],
                   ),
                 ),
-
-                // 2. BAGIAN BAWAH YANG BISA DI-SCROLL
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(
@@ -1298,7 +1377,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         _buildMenuItem(
                           icon: Icons.security_outlined,
                           title: 'Keamanan & Biometrik',
-                          subtitle: 'Kelola & hapus akses sidik jari/wajah',
+                          subtitle: 'Kelola & hapus akses sidik jari',
                           onTap: _showBiometricManageModal,
                         ),
                         _buildMenuItem(

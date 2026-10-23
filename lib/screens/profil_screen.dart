@@ -385,6 +385,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
 
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
+        if (!mounted) return;
         _showCropPreviewDialog(bytes);
       }
     } catch (e) {
@@ -762,6 +763,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             debugPrint('Gagal menghapus sidik jari: $e');
                           }
 
+                          if (!sheetContext.mounted) return;
                           Navigator.pop(sheetContext);
                           if (!mounted) return;
                           Navigator.pop(context);
@@ -792,6 +794,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                             debugPrint('Gagal memperbarui nama sidik jari: $e');
                           }
 
+                          if (!sheetContext.mounted) return;
                           Navigator.pop(sheetContext);
                           if (!mounted) return;
                           Navigator.pop(context);
@@ -1010,6 +1013,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                 _loadFingerprints();
                                 _showBiometricManageModal();
 
+                                if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
@@ -1160,7 +1164,6 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           ),
                         ),
                       ],
-                      // Logika Tombol Tambah & Pembatasan Maksimal 2 Sidik Jari
                       if (_fingerprints.length < 2) ...[
                         InkWell(
                           onTap: () {

@@ -941,24 +941,33 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Letakkan jari Anda',
+                            'Autentikasi Perangkat',
                             style: GoogleFonts.poppins(
                               color: const Color(0xFF1550B6),
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Letakkan jari Anda di atas sensor sidik jari perangkat Anda untuk mendaftarkan sidik jari',
+                            'Ketuk ikon sidik jari di bawah, lalu sentuh sensor biometrik pada perangkat Anda (di layar, tombol power, atau bagian belakang HP).',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
                               color: Colors.grey.shade600,
-                              fontSize: 14,
+                              fontSize: 13,
                               height: 1.4,
                             ),
                           ),
-                          const SizedBox(height: 60),
+                          const SizedBox(height: 10),
+                          Text(
+                            '(Ketuk ikon di bawah untuk memicu sensor)',
+                            style: GoogleFonts.poppins(
+                              color: const Color(0xFF1550B6),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 40),
                           GestureDetector(
                             onTap: () async {
                               bool authenticated = false;
@@ -998,6 +1007,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
 
                                 if (!mounted) return;
                                 Navigator.pop(context);
+                                _loadFingerprints();
                                 _showBiometricManageModal();
 
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1011,10 +1021,17 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                 );
                               }
                             },
-                            child: const Icon(
-                              Icons.fingerprint,
-                              size: 140,
-                              color: Color(0xFF1550B6),
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1550B6).withAlpha(26),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.fingerprint,
+                                size: 100,
+                                color: Color(0xFF1550B6),
+                              ),
                             ),
                           ),
                         ],
@@ -1143,34 +1160,61 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           ),
                         ),
                       ],
-                      InkWell(
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          _openAddFingerprintFlow();
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.add_circle_outline,
-                                color: Color(0xFF1550B6),
-                                size: 26,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Tambahkan Sidik Jari',
-                                style: GoogleFonts.poppins(
-                                  color: const Color(0xFF1550B6),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
+                      // Logika Tombol Tambah & Pembatasan Maksimal 2 Sidik Jari
+                      if (_fingerprints.length < 2) ...[
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            _openAddFingerprintFlow();
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.add_circle_outline,
+                                  color: Color(0xFF1550B6),
+                                  size: 26,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Tambahkan Sidik Jari',
+                                  style: GoogleFonts.poppins(
+                                    color: const Color(0xFF1550B6),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Catatan: Anda dapat mendaftarkan maksimal 2 sidik jari.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ] else ...[
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              'Batas maksimal 2 sidik jari telah tercapai.',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                     ],
                   ),
@@ -1378,7 +1422,10 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                           icon: Icons.security_outlined,
                           title: 'Keamanan & Biometrik',
                           subtitle: 'Kelola & hapus akses sidik jari',
-                          onTap: _showBiometricManageModal,
+                          onTap: () {
+                            _loadFingerprints();
+                            _showBiometricManageModal();
+                          },
                         ),
                         _buildMenuItem(
                           icon: Icons.logout,

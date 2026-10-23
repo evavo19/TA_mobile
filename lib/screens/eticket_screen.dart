@@ -10,11 +10,7 @@ class ETicketScreen extends StatefulWidget {
   final PesananModel? pesanan;
   final String? hashTiket;
 
-  const ETicketScreen({
-    super.key,
-    this.pesanan,
-    this.hashTiket,
-  });
+  const ETicketScreen({super.key, this.pesanan, this.hashTiket});
 
   @override
   State<ETicketScreen> createState() => _ETicketScreenState();
@@ -23,7 +19,8 @@ class ETicketScreen extends StatefulWidget {
 class _ETicketScreenState extends State<ETicketScreen> {
   PesananModel? _directPesanan;
   List<PesananModel> _listPesanan = [];
-  bool _isVerified = true; // 👈 Langsung true agar badge langsung hijau sejak awal
+  bool _isVerified =
+      true; // 👈 Langsung true agar badge langsung hijau sejak awal
   bool _isLoading = true;
   String _displayHash = '';
 
@@ -33,11 +30,11 @@ class _ETicketScreenState extends State<ETicketScreen> {
     if (widget.pesanan != null) {
       _directPesanan = widget.pesanan;
       String h = widget.hashTiket ?? widget.pesanan!.hash;
-      
+
       // 👈 Langsung set data tanpa menunggu loading/kedipan
       _displayHash = h;
       _isVerified = h.isNotEmpty;
-      _isLoading = false; 
+      _isLoading = false;
 
       // Verifikasi blockchain dijalankan senyap di background
       _verifyBlockchainData(_directPesanan!.qrCode, h);
@@ -76,7 +73,10 @@ class _ETicketScreenState extends State<ETicketScreen> {
       final response = await supabase
           .from('blockchain_tiket')
           .select()
-          .eq('user_id', currentUser.id) // 👈 Filter berdasarkan ID user yang login
+          .eq(
+            'user_id',
+            currentUser.id,
+          ) // 👈 Filter berdasarkan ID user yang login
           .order('id', ascending: false);
 
       if (mounted) {
@@ -122,8 +122,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
       body: _isLoading && widget.pesanan == null
           ? const Center(child: CircularProgressIndicator())
           : widget.pesanan != null
-              ? _buildDirectTicketView(primaryColor)
-              : _buildTixIdListView(primaryColor),
+          ? _buildDirectTicketView(primaryColor)
+          : _buildTixIdListView(primaryColor),
     );
   }
 
@@ -141,21 +141,23 @@ class _ETicketScreenState extends State<ETicketScreen> {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.grey.shade200),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 12,
-              ),
+              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: isUsed
                       ? const Color(0xFFFFEBEE)
-                      : (_isVerified ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE)),
+                      : (_isVerified
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFFFEBEE)),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -164,19 +166,31 @@ class _ETicketScreenState extends State<ETicketScreen> {
                     Icon(
                       isUsed
                           ? Icons.block_rounded
-                          : (_isVerified ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded),
+                          : (_isVerified
+                                ? Icons.verified_user_rounded
+                                : Icons.gpp_maybe_rounded),
                       size: 16,
-                      color: isUsed ? Colors.red.shade700 : (_isVerified ? const Color(0xFF2E7D32) : Colors.red),
+                      color: isUsed
+                          ? Colors.red.shade700
+                          : (_isVerified
+                                ? const Color(0xFF2E7D32)
+                                : Colors.red),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       isUsed
                           ? 'Sudah Digunakan (Hangus)'
-                          : (_isVerified ? 'Terverifikasi ✓' : 'Belum Terverifikasi'),
+                          : (_isVerified
+                                ? 'Terverifikasi ✓'
+                                : 'Belum Terverifikasi'),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isUsed ? Colors.red.shade700 : (_isVerified ? const Color(0xFF2E7D32) : Colors.red),
+                        color: isUsed
+                            ? Colors.red.shade700
+                            : (_isVerified
+                                  ? const Color(0xFF2E7D32)
+                                  : Colors.red),
                       ),
                     ),
                   ],
@@ -209,17 +223,27 @@ class _ETicketScreenState extends State<ETicketScreen> {
                   children: [
                     ColorFiltered(
                       colorFilter: isUsed
-                          ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
-                          : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                          ? const ColorFilter.mode(
+                              Colors.grey,
+                              BlendMode.saturation,
+                            )
+                          : const ColorFilter.mode(
+                              Colors.transparent,
+                              BlendMode.multiply,
+                            ),
                       child: QrImageView(
-                        data: item.qrCode.isNotEmpty ? item.qrCode : 'VALID_TICKET',
+                        data: item.qrCode.isNotEmpty
+                            ? item.qrCode
+                            : 'VALID_TICKET',
                         version: QrVersions.auto,
                         size: 160.0,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      isUsed ? 'Tiket Telah Hangus' : 'Tunjukkan QR ini ke Petugas',
+                      isUsed
+                          ? 'Tiket Telah Hangus'
+                          : 'Tunjukkan QR ini ke Petugas',
                       style: GoogleFonts.poppins(
                         fontSize: 11,
                         color: isUsed ? Colors.red.shade700 : Colors.grey,
@@ -240,7 +264,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 ),
                 const SizedBox(height: 2),
                 SelectableText(
-                  (_displayHash.isNotEmpty ? _displayHash : item.hash).length > 20
+                  (_displayHash.isNotEmpty ? _displayHash : item.hash).length >
+                          20
                       ? '${(_displayHash.isNotEmpty ? _displayHash : item.hash).substring(0, 16)}...'
                       : (_displayHash.isNotEmpty ? _displayHash : item.hash),
                   style: GoogleFonts.firaCode(
@@ -286,11 +311,18 @@ class _ETicketScreenState extends State<ETicketScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.confirmation_number_outlined, size: 64, color: primaryColor),
+                Icon(
+                  Icons.confirmation_number_outlined,
+                  size: 64,
+                  color: primaryColor,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Belum Ada E-Tiket',
-                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -321,10 +353,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ETicketScreen(
-                          pesanan: item,
-                          hashTiket: item.hash,
-                        ),
+                        builder: (context) =>
+                            ETicketScreen(pesanan: item, hashTiket: item.hash),
                       ),
                     );
                   },
@@ -332,7 +362,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: Colors.white, // 👈 Latar belakang kartu tetap putih bersih
+                color:
+                    Colors.white, // 👈 Latar belakang kartu tetap putih bersih
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -353,18 +384,27 @@ class _ETicketScreenState extends State<ETicketScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              isUsed ? 'Sudah Digunakan (Hangus)' : 'Terverifikasi ✓',
+                              isUsed
+                                  ? 'Sudah Digunakan (Hangus)'
+                                  : 'Terverifikasi ✓',
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: isUsed ? Colors.red.shade700 : const Color(0xFF2E7D32),
+                                color: isUsed
+                                    ? Colors.red.shade700
+                                    : const Color(0xFF2E7D32),
                               ),
                             ),
                             // Badge elegan penanda status di sisi kanan atas card
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: isUsed ? Colors.red.shade50 : primaryColor.withOpacity(0.1),
+                                color: isUsed
+                                    ? Colors.red.shade50
+                                    : primaryColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -372,7 +412,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: isUsed ? Colors.red.shade700 : primaryColor,
+                                  color: isUsed
+                                      ? Colors.red.shade700
+                                      : primaryColor,
                                 ),
                               ),
                             ),
@@ -424,8 +466,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                   width: 5,
                                   height: 1,
                                   child: DecoratedBox(
-                                    decoration:
-                                        BoxDecoration(color: Color(0xFFCBD5E1)),
+                                    decoration: BoxDecoration(
+                                      color: Color(0xFFCBD5E1),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -454,8 +497,14 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       children: [
                         ColorFiltered(
                           colorFilter: isUsed
-                              ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
-                              : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                              ? const ColorFilter.mode(
+                                  Colors.grey,
+                                  BlendMode.saturation,
+                                )
+                              : const ColorFilter.mode(
+                                  Colors.transparent,
+                                  BlendMode.multiply,
+                                ),
                           child: QrImageView(
                             data: item.qrCode,
                             version: QrVersions.auto,

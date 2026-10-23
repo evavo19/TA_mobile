@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/pesanan_model.dart';
 import '../models/wisata_model.dart';
-import '../screens/eticket_screen.dart';
 import '../services/blockchain_service.dart';
 import '../services/notifikasi_service.dart';
 
@@ -152,46 +150,29 @@ class _BookingScreenState extends State<BookingScreen> {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
-    final String qrCodeId = 'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user?.id ?? "guest"}&wisata=${widget.wisata.nama}';
+    final String qrCodeId =
+        'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user?.id ?? "guest"}&wisata=${widget.wisata.nama}';
 
-    String generatedHash = '';
     try {
-      // 1. Generate Hash Blockchain
-      generatedHash = await BlockchainService.tambahBlok(
+      // PROSES SIMPAN CHUKUP DARI SINI (SISTEM BLOCKCHAIN TERINTEGRASI)
+      await BlockchainService.tambahBlok(
         ticketId: qrCodeId,
         namaWisata: widget.wisata.nama,
         tanggalKunjungan: tanggalFormatted,
         jumlahTiket: _jumlahTiket,
         totalHarga: _calculateTotalPrice(),
       );
-    } catch (e) {
-      debugPrint("Gagal generate blockchain: $e");
-    }
 
-    final pesanan = PesananModel(
-      qrCode: qrCodeId,
-      namaWisata: widget.wisata.nama,
-      tanggalKunjungan: tanggalFormatted,
-      jumlahTiket: _jumlahTiket,
-      totalHarga: _calculateTotalPrice(),
-      previousHash: '',
-      hash: generatedHash,
-      createdAt: DateTime.now().toIso8601String(),
-    );
-
-    try {
-      // 2. Simpan ke tabel 'blockchain_tiket' di Supabase
-      await supabase.from('blockchain_tiket').insert(pesanan.toMap());
-      debugPrint("Berhasil menyimpan ke tabel blockchain_tiket!");
+      debugPrint("Berhasil menyimpan tiket secara tunggal ke Supabase!");
     } catch (e) {
-      debugPrint("Gagal menyimpan ke Supabase: $e");
+      debugPrint("Gagal memproses pembayaran: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
 
     NotificationService.show(
       title: 'Pembayaran Berhasil',
-      body: 'Tiket ${pesanan.namaWisata} (${pesanan.jumlahTiket} orang) berhasil dipesan!',
+      body: 'Tiket ${widget.wisata.nama} ($_jumlahTiket orang) berhasil dipesan!',
     );
 
     if (mounted) {
@@ -200,18 +181,10 @@ class _BookingScreenState extends State<BookingScreen> {
         'Tiket berhasil disimpan!',
       );
 
-      // Arahkan langsung ke halaman detail e-ticket dengan hash blockchain
+      // LANGSUNG TUTUP FORM PEMESANAN
       Future.delayed(const Duration(milliseconds: 800), () {
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ETicketScreen(
-              pesanan: pesanan,
-              hashTiket: generatedHash,
-            ),
-          ),
-        );
+        Navigator.pop(context);
       });
     }
   }

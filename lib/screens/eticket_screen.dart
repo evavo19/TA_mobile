@@ -32,16 +32,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
     super.initState();
     if (widget.pesanan != null) {
       _directPesanan = widget.pesanan;
-      _verifyBlockchainData(_directPesanan!.qrCode, widget.hashTiket ?? '');
+      String h = widget.hashTiket ?? widget.pesanan!.hash;
+      _verifyBlockchainData(_directPesanan!.qrCode, h);
     } else {
-      _loadAllTickets();
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (widget.pesanan == null) {
       _loadAllTickets();
     }
   }
@@ -217,7 +210,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
               const SizedBox(height: 16),
 
-              if (_displayHash.isNotEmpty) ...[
+              if (_displayHash.isNotEmpty || item.hash.isNotEmpty) ...[
                 Text(
                   'Hash Tiket (Blockchain):',
                   style: GoogleFonts.poppins(
@@ -227,9 +220,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 ),
                 const SizedBox(height: 2),
                 SelectableText(
-                  _displayHash.length > 20
-                      ? '${_displayHash.substring(0, 16)}...'
-                      : _displayHash,
+                  (_displayHash.isNotEmpty ? _displayHash : item.hash).length > 20
+                      ? '${(_displayHash.isNotEmpty ? _displayHash : item.hash).substring(0, 16)}...'
+                      : (_displayHash.isNotEmpty ? _displayHash : item.hash),
                   style: GoogleFonts.firaCode(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -306,7 +299,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 MaterialPageRoute(
                   builder: (context) => ETicketScreen(
                     pesanan: item,
-                    hashTiket: item.hash.isNotEmpty ? item.hash : item.qrCode,
+                    hashTiket: item.hash,
                   ),
                 ),
               );

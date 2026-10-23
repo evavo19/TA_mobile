@@ -1,6 +1,6 @@
 class PesananModel {
-  final dynamic id; // int8 di supabase
-  final String qrCode; // Berfungsi sebagai ticket_id
+  final dynamic id;
+  final String qrCode;
   final String namaWisata;
   final String tanggalKunjungan;
   final int jumlahTiket;
@@ -24,7 +24,7 @@ class PesananModel {
   factory PesananModel.fromMap(Map<String, dynamic> map) {
     return PesananModel(
       id: map['id'],
-      qrCode: map['ticket_id'] ?? '',
+      qrCode: map['ticket_id'] ?? map['qr_code'] ?? '',
       namaWisata: map['nama_wisata'] ?? '',
       tanggalKunjungan: map['tanggal_kunjungan'] ?? '',
       jumlahTiket: map['jumlah_tiket'] != null

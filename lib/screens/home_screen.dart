@@ -278,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Temukan destinasi favoritmu dan nikmati promo menarik!',
+                              'Temukan destinasi favoritmu dan nikmati suasana Jogja!',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.poppins(

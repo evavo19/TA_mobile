@@ -4,7 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/wisata_model.dart';
 import 'detail_wisata_screen.dart';
-import 'notifikasi_screen.dart'; // 👈 Import halaman notifikasi
+import 'notifikasi_screen.dart';
+import 'wisata_gratis_screen.dart';
+import '../features/game.dart'; // QuizScreen
+import '../features/feedback.dart'; // FeedbackScreen
+import '../services/gps_service.dart'; // LbsScreen (sesuaikan path-nya)
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +31,22 @@ class _HomeScreenState extends State<HomeScreen> {
     'Budaya Dan Sejarah',
     'Kuliner',
   ];
+
+  /// Nama user yang sedang login.
+  /// Urutan: metadata (nama / full_name / name) -> bagian depan email -> 'Wisatawan'
+  String get _userName {
+    final user = supabase.auth.currentUser;
+    final meta = user?.userMetadata;
+    final name = meta?['nama'] ?? meta?['full_name'] ?? meta?['name'];
+    if (name != null && name.toString().trim().isNotEmpty) {
+      return name.toString();
+    }
+    final email = user?.email;
+    if (email != null && email.isNotEmpty) {
+      return email.split('@').first;
+    }
+    return 'Wisatawan';
+  }
 
   @override
   void initState() {
@@ -66,10 +86,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontSize: 20,
                 ),
               ),
-              // 👇 Tombol Icon Notifikasi Ditambahkan di Sini
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                  ),
                   tooltip: 'Notifikasi & Izin',
                   onPressed: () {
                     Navigator.push(
@@ -83,29 +105,62 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
               ],
               bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(70),
+                preferredSize: const Size.fromHeight(100),
                 child: Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                   color: primaryColor,
-                  child: TextField(
-                    onChanged: (value) {
-                      setState(() => _searchQuery = value.toLowerCase());
-                    },
-                    style: GoogleFonts.poppins(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Cari destinasi wisata...',
-                      hintStyle: GoogleFonts.poppins(
-                        color: Colors.grey.shade400,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Sapaan
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: 'Hai, ',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            TextSpan(
+                              text: _userName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                        ),
                       ),
-                      prefixIcon: const Icon(Icons.search, color: primaryColor),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: BorderSide.none,
+                      const SizedBox(height: 12),
+                      // Search bar
+                      TextField(
+                        onChanged: (value) {
+                          setState(() => _searchQuery = value.toLowerCase());
+                        },
+                        style: GoogleFonts.poppins(fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Cari destinasi wisata...',
+                          hintStyle: GoogleFonts.poppins(
+                            color: Colors.grey.shade400,
+                          ),
+                          prefixIcon:
+                              const Icon(Icons.search, color: primaryColor),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -117,7 +172,137 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Judul Kategori Wisata
+              // ===== Tombol menu cepat =====
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _QuickMenuItem(
+                        icon: Icons.location_on_rounded,
+                        label: 'Terdekat',
+                        color: const Color(0xFF10B981),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LbsScreen()),
+                        ),
+                      ),
+                      _QuickMenuItem(
+                        icon: Icons.money_off_rounded,
+                        label: 'Gratis',
+                        color: const Color(0xFFF97316),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WisataGratisScreen(),
+                          ),
+                        ),
+                      ),
+                      _QuickMenuItem(
+                        icon: Icons.rate_review_rounded,
+                        label: 'Masukan',
+                        color: primaryColor,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FeedbackScreen(),
+                          ),
+                        ),
+                      ),
+                      _QuickMenuItem(
+                        icon: Icons.sports_esports_rounded,
+                        label: 'Mini Game',
+                        color: const Color(0xFF8B5CF6),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const QuizScreen()),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ===== Banner =====
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  height: 120,
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1550B6), Color(0xFF3B82F6)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    // Kalau mau pakai gambar, ganti gradient dengan:
+                    // image: DecorationImage(
+                    //   image: AssetImage('assets/banner.jpg'),
+                    //   fit: BoxFit.cover,
+                    // ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Spesial Jogja',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Temukan destinasi favoritmu dan nikmati suasana Jogja!',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.temple_buddhist_rounded,
+                        color: Colors.white54,
+                        size: 56,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ===== Kategori =====
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Text(
@@ -131,7 +316,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Chip Kategori
               SizedBox(
                 height: 40,
                 child: ListView.builder(
@@ -149,12 +333,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         showCheckmark: false,
                         labelStyle: GoogleFonts.poppins(
                           fontSize: 13,
-                          color: isSelected
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+                          color:
+                              isSelected ? Colors.white : Colors.grey.shade600,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
                         ),
                         selectedColor: primaryColor,
                         backgroundColor: Colors.white,
@@ -178,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 24),
 
-              // Judul Rekomendasi Wisata
+              // ===== Rekomendasi =====
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Text(
@@ -192,7 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Daftar Wisata
               FutureBuilder<List<WisataModel>>(
                 future: _wisataFuture,
                 builder: (context, snapshot) {
@@ -221,11 +402,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   final allWisata = snapshot.data ?? [];
 
                   final filteredWisata = allWisata.where((wisata) {
-                    final matchesSearch = wisata.nama.toLowerCase().contains(
-                      _searchQuery,
-                    );
-                    final matchesCategory =
-                        _selectedCategory == 'Semua' ||
+                    final matchesSearch =
+                        wisata.nama.toLowerCase().contains(_searchQuery);
+                    final matchesCategory = _selectedCategory == 'Semua' ||
                         wisata.kategori.toLowerCase() ==
                             _selectedCategory.toLowerCase();
                     return matchesSearch && matchesCategory;
@@ -326,9 +505,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFFFFBEB),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
                                           child: Row(
                                             children: [
@@ -343,9 +521,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 style: GoogleFonts.poppins(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 13,
-                                                  color: const Color(
-                                                    0xFF92400E,
-                                                  ),
+                                                  color:
+                                                      const Color(0xFF92400E),
                                                 ),
                                               ),
                                             ],
@@ -398,6 +575,57 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Satu tombol menu cepat (ikon bulat + label).
+class _QuickMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool active;
+
+  const _QuickMenuItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: active ? color : color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: active ? Colors.white : color, size: 26),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+          ],
         ),
       ),
     );

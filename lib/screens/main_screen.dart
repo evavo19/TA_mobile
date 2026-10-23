@@ -80,7 +80,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+      // Lokasi custom: tetap menempel di lekukan walau ada SnackBar
+      floatingActionButtonLocation: const _DockedNoSnackBarLocation(),
 
       // Bottom bar: bayangan + isi putih digambar di belakang,
       // garis border digambar di depan. Semua memakai satu path lekukan.
@@ -173,6 +175,23 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Lokasi FAB "centerDocked" versi sendiri.
+/// Bedanya dengan bawaan Flutter: posisinya TIDAK ikut naik saat SnackBar
+/// muncul, jadi tombol kompas selalu pas di lekukan bottom bar.
+class _DockedNoSnackBarLocation extends FloatingActionButtonLocation {
+  const _DockedNoSnackBarLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
+    final x =
+        (geometry.scaffoldSize.width - geometry.floatingActionButtonSize.width) /
+            2;
+    final y =
+        geometry.contentBottom - geometry.floatingActionButtonSize.height / 2;
+    return Offset(x, y);
   }
 }
 

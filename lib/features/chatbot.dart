@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Import model dan screen detail wisata
@@ -20,11 +23,15 @@ class ChatbotScreen extends StatefulWidget {
 class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
 
   late final String _geminiApiKey;
   late final GenerativeModel _model;
-  late final ChatSession _chat;
   bool _isLoading = false;
+  bool _loadingHasImage = false; // untuk teks loading yang sesuai
+
+  // Variabel untuk menampung bytes foto yang di-upload user
+  Uint8List? _selectedImageBytes;
 
   // GPS User Location (Default: Malioboro)
   double _userLat = -7.7926;
@@ -35,9 +42,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     {
       'isUser': false,
       'text':
-          'Halo! Aku Asisten AI LelunganJogja. Mau cari rekomendasi wisata sesuai budget, lokasi terdekat, yang bisa dijalanin kaki, atau kategori favoritmu?',
+          'Halo! Aku Asisten AI LelunganJogja. Kamu bisa tanya rekomendasi wisata, atau upload foto wisata biar kubantu kenali lokasi dan harga tiketnya!',
       'cards': <Map<String, dynamic>>[],
       'time': '10:00',
+      'imageBytes': null,
     }
   ];
 
@@ -48,17 +56,30 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _initUserGps();
   }
 
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   void _initGemini() {
     _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    // (debugPrint API key dihapus supaya key tidak muncul di log)
+
+    // Model terbaru (gemini-1.5-* dan gemini-2.5-flash sudah tidak tersedia untuk user baru)
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.8-flash',
       apiKey: _geminiApiKey,
       systemInstruction: Content.system(
         'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '
-        'Jawablah pertanyaan pengguna berdasarkan rekomendasi data tempat wisata Jogja yang diberikan secara singkat, jelas, ramah, dan informatif tanpa emoji berlebihan.',
+        'Jika pengguna mengirimkan foto tempat wisata, analisislah gambar tersebut dan sebutkan nama tempat wisata di Yogyakarta yang paling sesuai dari daftar database yang diberikan. '
+        'Kamu hanya boleh menjawab pertanyaan yang berkaitan dengan data wisata di daftar referensi database (kategori apa pun) dan aplikasi LelunganJogja. '
+        'Jika pertanyaan di luar topik itu, jawab persis: "Maaf, pertanyaan Anda di luar topik." tanpa tambahan apa pun. '
+        'Jika pertanyaan masih seputar wisata atau aplikasi tetapi informasinya tidak ada di daftar referensi, jawab: "Maaf, aku tidak tahu informasi itu." dan jangan mengarang. '
+        'Jawablah secara singkat, ramah, dan informatif.',
       ),
     );
-    _chat = _model.startChat();
   }
 
   Future<void> _initUserGps() async {
@@ -74,6 +95,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           Position pos = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.high,
           );
+          if (!mounted) return;
           setState(() {
             _userLat = pos.latitude;
             _userLng = pos.longitude;
@@ -94,184 +116,185 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     return 12742 * asin(sqrt(a));
   }
 
-  // Parser Budget, Jalan Kaki, & Filter Dinamis Supabase
-  Future<List<Map<String, dynamic>>> _getWisataFromSupabase(
-      String query) async {
+  // Fungsi Pilih Gambar dari Galeri atau Kamera
+  Future<void> _pickImage(ImageSource source) async {
     try {
-      String lowerQuery = query.toLowerCase();
-      var dbQuery = Supabase.instance.client.from('wisata').select();
-
-      // 1. PARSING HARGA / BUDGET DARI TEKS USER
-      int? maxBudget;
-      final RegExp regExpAngka = RegExp(r'(\d+[\.\d]*)\s*(rb|ribu)?');
-      final match = regExpAngka.firstMatch(lowerQuery);
-
-      if (match != null) {
-        String angkaStr = match.group(1)!.replaceAll('.', '');
-        int baseVal = int.tryParse(angkaStr) ?? 0;
-        bool hasRb = match.group(2) != null;
-
-        if (hasRb) {
-          maxBudget = baseVal * 1000;
-        } else if (baseVal < 1000 && baseVal > 0) {
-          maxBudget = baseVal * 1000;
-        } else {
-          maxBudget = baseVal;
-        }
-      } else if (lowerQuery.contains('gratis')) {
-        maxBudget = 0;
-      } else if (lowerQuery.contains('murah')) {
-        maxBudget = 10000;
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        if (!mounted) return;
+        setState(() {
+          _selectedImageBytes = bytes;
+        });
       }
-
-      if (maxBudget != null) {
-        if (maxBudget > 0) {
-          // Jika user menyebutkan angka budget (>0), filter harga Rp 1.000 s/d maxBudget
-          dbQuery = dbQuery
-              .gte('harga_weekday', 1000)
-              .lte('harga_weekday', maxBudget);
-        } else {
-          // Jika user spesifik mencari yang "gratis", ambil harga_weekday = 0
-          dbQuery = dbQuery.eq('harga_weekday', 0);
-        }
-      }
-
-      // 2. PARSING LOKASI DAERAH
-      if (lowerQuery.contains('bantul') ||
-          lowerQuery.contains('imogiri') ||
-          lowerQuery.contains('piyungan')) {
-        dbQuery = dbQuery.ilike('deskripsi', '%bantul%');
-      } else if (lowerQuery.contains('sleman') ||
-          lowerQuery.contains('kaliurang')) {
-        dbQuery = dbQuery.ilike('deskripsi', '%sleman%');
-      } else if (lowerQuery.contains('gunungkidul') ||
-          lowerQuery.contains('wonosari')) {
-        dbQuery = dbQuery.ilike('deskripsi', '%gunungkidul%');
-      }
-
-      // 3. PARSING KATEGORI
-      if (lowerQuery.contains('pantai')) {
-        dbQuery = dbQuery.ilike('kategori', '%pantai%');
-      } else if (lowerQuery.contains('alam')) {
-        dbQuery = dbQuery.ilike('kategori', '%alam%');
-      } else if (lowerQuery.contains('budaya') ||
-          lowerQuery.contains('sejarah') ||
-          lowerQuery.contains('candi') ||
-          lowerQuery.contains('museum')) {
-        dbQuery = dbQuery.ilike('kategori', '%budaya%');
-      }
-
-      final List<dynamic> data = await dbQuery;
-
-      List<Map<String, dynamic>> results = data.map((item) {
-        double itemLat = (item['latitude'] as num?)?.toDouble() ?? 0.0;
-        double itemLng = (item['longitude'] as num?)?.toDouble() ?? 0.0;
-        double distance =
-            _calculateDistance(_userLat, _userLng, itemLat, itemLng);
-
-        Map<String, dynamic> rawItem = Map<String, dynamic>.from(item);
-
-        rawItem['jarak'] = '${distance.toStringAsFixed(1)} km';
-        rawItem['jarak_num'] = distance;
-        rawItem['harga'] = 'Rp ${item['harga_weekday'] ?? 0}';
-
-        return rawItem;
-      }).toList();
-
-      // 4. PARSING "JALAN KAKI" / DESTINASI SANGAT DEKAT (<= 1.5 KM)
-      bool isWalk = lowerQuery.contains('jalan kaki') ||
-          lowerQuery.contains('ditempuh jalan') ||
-          lowerQuery.contains('jalan aja') ||
-          lowerQuery.contains('jalan santai') ||
-          lowerQuery.contains('dekat banget');
-
-      if (isWalk) {
-        results = results
-            .where((item) => (item['jarak_num'] as double) <= 1.5)
-            .toList();
-      }
-
-      // 5. URUTKAN HASIL
-      if (maxBudget != null && maxBudget > 0) {
-        // Urutkan dari harga tertinggi mendekati budget pengguna
-        results.sort((a, b) => ((b['harga_weekday'] ?? 0) as int)
-            .compareTo((a['harga_weekday'] ?? 0) as int));
-      } else {
-        // Urutkan berdasarkan jarak terdekat
-        results.sort((a, b) =>
-            (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
-      }
-
-      return results.take(4).toList();
     } catch (e) {
-      return [];
+      debugPrint("Error picking image: $e");
     }
   }
 
+  // Fungsi Kirim Pesan (Mendukung Teks + Gambar Multimodal yang Aman)
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty || _isLoading) return;
+    if ((text.trim().isEmpty && _selectedImageBytes == null) || _isLoading) {
+      return;
+    }
 
-    final userText = text.trim();
+    final userText = text.trim().isEmpty
+        ? "Tempat wisata apakah ini? Mohon berikan informasi nama tempat, lokasi, dan harga tiketnya."
+        : text.trim();
+
+    final currentImageBytes = _selectedImageBytes;
+
     _messageController.clear();
-
     setState(() {
       _messages.add({
         'isUser': true,
         'text': userText,
         'cards': <Map<String, dynamic>>[],
         'time': _getCurrentTime(),
+        'imageBytes': currentImageBytes,
       });
+      _selectedImageBytes = null; // Reset preview setelah dikirim
+      _loadingHasImage = currentImageBytes != null;
       _isLoading = true;
     });
 
     _scrollToBottom();
 
-    // 1. Ambil data wisata terpilih dari Supabase
-    List<Map<String, dynamic>> matchedCards =
-        await _getWisataFromSupabase(userText);
-
     try {
-      // 2. Buat Context Prompt untuk Gemini AI
+      // 1. Ambil data wisata dari Supabase sebagai referensi
+      List<Map<String, dynamic>> wisataList = [];
+      try {
+        final List<dynamic> allData = await Supabase.instance.client
+            .from('wisata')
+            .select()
+            .limit(50);
+
+        wisataList = allData.map((item) {
+          double itemLat = (item['latitude'] as num?)?.toDouble() ?? 0.0;
+          double itemLng = (item['longitude'] as num?)?.toDouble() ?? 0.0;
+          double distance =
+              _calculateDistance(_userLat, _userLng, itemLat, itemLng);
+
+          Map<String, dynamic> rawItem = Map<String, dynamic>.from(item);
+          rawItem['jarak'] = '${distance.toStringAsFixed(1)} km';
+          rawItem['jarak_num'] = distance;
+          rawItem['harga'] = 'Rp ${item['harga_weekday'] ?? 0}';
+          return rawItem;
+        }).toList();
+      } catch (dbError) {
+        debugPrint("Error fetching Supabase: $dbError");
+      }
+
+      // 2. Siapkan Part Content untuk Gemini AI
+      List<Part> contentParts = [];
+
+      if (currentImageBytes != null) {
+        contentParts.add(DataPart('image/jpeg', currentImageBytes));
+      }
+
       String prompt = '''
 Posisi GPS Pengguna saat ini: Latitude $_userLat, Longitude $_userLng.
 Pertanyaan Pengguna: "$userText"
 
-Berikut adalah daftar tempat wisata dari Database Supabase yang SESUAI dengan kriteria/budget/jarak pengguna:
-${matchedCards.isEmpty ? "Tidak ditemukan tempat wisata yang sesuai persis dengan kriteria tersebut." : matchedCards.map((w) => "- ${w['nama']} (Kategori: ${w['kategori']}, Jarak: ${w['jarak']}, Harga Tiket: ${w['harga']}, Rating: ${w['rating']})").join('\n')}
+Berikut adalah daftar referensi tempat wisata di database Supabase kami:
+${wisataList.isEmpty ? "Belum ada data referensi." : wisataList.map((w) => "- Nama: ${w['nama']}, Kategori: ${w['kategori']}, Harga Tiket: ${w['harga']}, Jarak: ${w['jarak']}").join('\n')}
 
 Instruksi untuk AI:
-- Jawablah pertanyaan pengguna secara ramah dan natural.
-- Jika ada hasil wisata di atas, rekomendasikan nama tempat tersebut beserta info jarak/harganya.
-- Jika tidak ada hasil yang sesuai, jawab dengan sopan bahwa belum ada tempat wisata yang cocok di database.
+- Jika pengguna mengirim foto, analisislah gambar tersebut dan cari nama tempat yang PALING SESUAI dari daftar referensi di atas.
+- Sebutkan nama tempat wisatanya dengan jelas di awal kalimat balasan, beserta perkiraan jarak dan harga tiketnya.
+- Jika pertanyaan di luar topik wisata/database/aplikasi LelunganJogja, jawab persis: "Maaf, pertanyaan Anda di luar topik."
+- Jika pertanyaan seputar wisata tetapi tidak ada di daftar referensi, jawab: "Maaf, aku tidak tahu informasi itu." Jangan mengarang.
+- Jawablah dengan ramah dan natural.
 ''';
 
-      final response = await _chat.sendMessage(Content.text(prompt));
+      contentParts.add(TextPart(prompt));
 
+      // 3. Kirim request multimodal ke Gemini Model secara langsung
+      final response =
+          await _generateWithRetry([Content.multi(contentParts)]);
+      String responseText = response.text ?? 'Tidak ada respons dari AI.';
+
+      // 4. Pencocokan Kartu Berdasarkan Nama Tempat di Respon AI
+      List<Map<String, dynamic>> matchedCards = [];
+      for (var item in wisataList) {
+        String namaWisata = item['nama'].toString().toLowerCase();
+        List<String> keywords = namaWisata.split(' ');
+
+        bool isKeywordMatch = keywords.any(
+            (kw) => kw.length > 3 && responseText.toLowerCase().contains(kw));
+
+        if (responseText.toLowerCase().contains(namaWisata) || isKeywordMatch) {
+          if (!matchedCards.contains(item)) {
+            matchedCards.add(item);
+          }
+        }
+      }
+
+      // Jika user bertanya soal terdekat via teks/quick chip tanpa foto
+      if (matchedCards.isEmpty &&
+          currentImageBytes == null &&
+          (userText.toLowerCase().contains('terdekat') ||
+              userText.toLowerCase().contains('dekat'))) {
+        wisataList.sort((a, b) =>
+            (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
+        matchedCards = wisataList.take(3).toList();
+      }
+
+      if (!mounted) return;
       setState(() {
         _messages.add({
           'isUser': false,
-          'text': response.text ??
-              'Berikut rekomendasi tempat wisata yang sesuai untuk Anda:',
+          'text': responseText,
           'cards': matchedCards,
           'time': _getCurrentTime(),
+          'imageBytes': null,
         });
       });
     } catch (e) {
+      debugPrint("ERROR CHATBOT: $e");
+      if (!mounted) return;
       setState(() {
         _messages.add({
           'isUser': false,
-          'text': matchedCards.isNotEmpty
-              ? 'Berikut rekomendasi destinasi yang sesuai dengan pencarianmu:'
-              : 'Maaf, terjadi masalah saat memproses permintaan. Pastikan koneksi internet aktif.',
-          'cards': matchedCards,
+          'text': (e.toString().contains('503') ||
+                  e.toString().contains('UNAVAILABLE'))
+              ? 'Server AI sedang sibuk. Tunggu beberapa detik lalu coba kirim lagi ya.'
+              : 'Maaf, terjadi kendala saat menghubungi AI. Silakan coba lagi.',
+          'cards': <Map<String, dynamic>>[],
           'time': _getCurrentTime(),
+          'imageBytes': null,
         });
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
-      _scrollToBottom();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  // Otomatis coba ulang (maks 3x) kalau server Gemini sedang sibuk (503) / kena limit (429)
+  Future<GenerateContentResponse> _generateWithRetry(
+      List<Content> content) async {
+    const maxAttempts = 3;
+    for (var attempt = 1;; attempt++) {
+      try {
+        return await _model.generateContent(content);
+      } catch (e) {
+        final msg = e.toString();
+        final isBusy = msg.contains('503') ||
+            msg.contains('UNAVAILABLE') ||
+            msg.contains('429');
+        if (!isBusy || attempt >= maxAttempts) rethrow;
+        await Future.delayed(Duration(seconds: 2 * attempt));
+      }
     }
   }
 
@@ -299,10 +322,10 @@ Instruksi untuk AI:
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
-        automaticallyImplyLeading: false, // Tanpa panah back
-        centerTitle: true, // 👈 Judul diposisikan di tengah
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center, // 👈 Konten di dalam title di-center
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
@@ -315,7 +338,7 @@ Instruksi untuk AI:
             ),
             Row(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center, // 👈 Baris lokasi di-center
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.location_on, size: 11, color: Colors.white70),
                 const SizedBox(width: 4),
@@ -344,6 +367,7 @@ Instruksi untuk AI:
               itemBuilder: (context, index) {
                 final msg = _messages[index];
                 final isUser = msg['isUser'];
+                final Uint8List? imgBytes = msg['imageBytes'];
                 final List<Map<String, dynamic>> cards =
                     List<Map<String, dynamic>>.from(msg['cards'] ?? []);
 
@@ -375,6 +399,19 @@ Instruksi untuk AI:
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Tampilkan foto jika pesan dari user memuat gambar
+                        if (imgBytes != null) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.memory(
+                              imgBytes,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         Text(
                           msg['text'],
                           style: GoogleFonts.poppins(
@@ -384,7 +421,7 @@ Instruksi untuk AI:
                           ),
                         ),
 
-                        // Card Carousel Gambar
+                        // Card Carousel Gambar Rekomendasi
                         if (cards.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           SizedBox(
@@ -396,13 +433,13 @@ Instruksi untuk AI:
                                 final item = cards[cardIndex];
                                 return GestureDetector(
                                   onTap: () {
-                                    // Konversi Map ke WisataModel
-                                    final wisataModel = WisataModel.fromMap(item);
-
+                                    final wisataModel =
+                                        WisataModel.fromMap(item);
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => DetailWisataScreen(
+                                        builder: (context) =>
+                                            DetailWisataScreen(
                                           wisata: wisataModel,
                                         ),
                                       ),
@@ -472,7 +509,8 @@ Instruksi untuk AI:
                                                   const SizedBox(width: 2),
                                                   Text(
                                                     '${item['rating'] ?? 4.5}',
-                                                    style: GoogleFonts.poppins(
+                                                    style:
+                                                        GoogleFonts.poppins(
                                                       fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -481,7 +519,8 @@ Instruksi untuk AI:
                                                   const Spacer(),
                                                   Text(
                                                     item['harga'] ?? 'Rp 0',
-                                                    style: GoogleFonts.poppins(
+                                                    style:
+                                                        GoogleFonts.poppins(
                                                       fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -533,9 +572,46 @@ Instruksi untuk AI:
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6.0),
               child: Text(
-                'Gemini AI sedang mengambil data Supabase & berpikir...',
+                _loadingHasImage
+                    ? 'Gemini AI sedang menganalisis gambar & data Supabase...'
+                    : 'Gemini AI sedang mencari jawaban dari data Supabase...',
                 style: GoogleFonts.poppins(
                     fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ),
+
+          // Preview Gambar yang Dipilih Sebelum Dikirim
+          if (_selectedImageBytes != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      _selectedImageBytes!,
+                      height: 50,
+                      width: 50,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Foto siap dikirim. Ketik pertanyaan atau kirim langsung!',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.red),
+                    onPressed: () {
+                      setState(() {
+                        _selectedImageBytes = null;
+                      });
+                    },
+                  ),
+                ],
               ),
             ),
 
@@ -554,8 +630,8 @@ Instruksi untuk AI:
                 _buildQuickChip(
                   icon: Icons.attach_money,
                   label: 'Wisata Rp 20.000',
-                  onTap: () =>
-                      _sendMessage('Rekomendasi wisata dengan tiket 20000 dong'),
+                  onTap: () => _sendMessage(
+                      'Rekomendasi wisata dengan tiket 20000 dong'),
                 ),
                 _buildQuickChip(
                   icon: Icons.near_me_outlined,
@@ -567,20 +643,51 @@ Instruksi untuk AI:
             ),
           ),
 
-          // Input Bar
+          // Input Bar dengan Tombol Galeri/Kamera di Kiri
           Container(
             padding: const EdgeInsets.all(12),
             color: Colors.white,
             child: SafeArea(
               child: Row(
                 children: [
+                  // Tombol Ikon Upload Foto
+                  IconButton(
+                    icon: const Icon(Icons.image_outlined,
+                        color: Color(0xFF1550B6)),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (context) => SafeArea(
+                          child: Wrap(
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.photo_library),
+                                title: const Text('Pilih dari Galeri'),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _pickImage(ImageSource.gallery);
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.camera_alt),
+                                title: const Text('Ambil Foto dari Kamera'),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _pickImage(ImageSource.camera);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
                       style: GoogleFonts.poppins(fontSize: 14),
                       decoration: InputDecoration(
-                        hintText:
-                            'Tanya budget, jalan kaki, wisata terdekat...',
+                        hintText: 'Tanya atau upload foto wisata...',
                         hintStyle: GoogleFonts.poppins(
                             fontSize: 13, color: Colors.grey.shade400),
                         filled: true,
@@ -632,9 +739,6 @@ Instruksi untuk AI:
           ),
         ),
         backgroundColor: Colors.white,
-// SKILL: /system:skill-creator
-// SKILL: /system:skill-updater
-// SKILL: /system:wellness_coach
         side: const BorderSide(color: Color(0xFF1550B6), width: 1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),

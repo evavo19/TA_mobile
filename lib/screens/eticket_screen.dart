@@ -23,7 +23,7 @@ class ETicketScreen extends StatefulWidget {
 class _ETicketScreenState extends State<ETicketScreen> {
   PesananModel? _directPesanan;
   List<PesananModel> _listPesanan = [];
-  bool _isVerified = false;
+  bool _isVerified = true; // 👈 Langsung true agar badge langsung hijau sejak awal
   bool _isLoading = true;
   String _displayHash = '';
 
@@ -33,9 +33,16 @@ class _ETicketScreenState extends State<ETicketScreen> {
     if (widget.pesanan != null) {
       _directPesanan = widget.pesanan;
       String h = widget.hashTiket ?? widget.pesanan!.hash;
+      
+      // 👈 Langsung set data tanpa menunggu loading/kedipan
+      _displayHash = h;
+      _isVerified = h.isNotEmpty;
+      _isLoading = false; 
+
+      // Verifikasi blockchain dijalankan senyap di background
       _verifyBlockchainData(_directPesanan!.qrCode, h);
     } else {
-      _loadAllTickets();
+      _loadUserTickets(); // Mengambil tiket khusus user yang sedang login
     }
   }
 
@@ -48,22 +55,28 @@ class _ETicketScreenState extends State<ETicketScreen> {
     if (mounted) {
       setState(() {
         _isVerified = isAuthentic || currentHash.isNotEmpty;
-        _displayHash = currentHash;
-        _isLoading = false;
       });
     }
   }
 
-  Future<void> _loadAllTickets() async {
+  // 🔄 Fungsi mengambil tiket HANYA untuk user yang sedang aktif login
+  Future<void> _loadUserTickets() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
     final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final response = await supabase
           .from('blockchain_tiket')
           .select()
+          .eq('user_id', currentUser.id) // 👈 Filter berdasarkan ID user yang login
           .order('id', ascending: false);
 
       if (mounted) {
@@ -75,7 +88,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
         });
       }
     } catch (e) {
-      debugPrint("Gagal mengambil data dari blockchain_tiket: $e");
+      debugPrint("Gagal mengambil data tiket user: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -102,7 +115,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
           if (widget.pesanan == null)
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadAllTickets,
+              onPressed: _loadUserTickets,
             ),
         ],
       ),
@@ -116,6 +129,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
   Widget _buildDirectTicketView(Color primaryColor) {
     final item = _directPesanan!;
+    final bool isUsed = item.isUsed;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -138,28 +153,30 @@ class _ETicketScreenState extends State<ETicketScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _isVerified
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFFFEBEE),
+                  color: isUsed
+                      ? const Color(0xFFFFEBEE)
+                      : (_isVerified ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE)),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _isVerified
-                          ? Icons.verified_user_rounded
-                          : Icons.gpp_maybe_rounded,
+                      isUsed
+                          ? Icons.block_rounded
+                          : (_isVerified ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded),
                       size: 16,
-                      color: _isVerified ? const Color(0xFF2E7D32) : Colors.red,
+                      color: isUsed ? Colors.red.shade700 : (_isVerified ? const Color(0xFF2E7D32) : Colors.red),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _isVerified ? 'Terverifikasi ✓' : 'Belum Terverifikasi',
+                      isUsed
+                          ? 'Sudah Digunakan (Hangus)'
+                          : (_isVerified ? 'Terverifikasi ✓' : 'Belum Terverifikasi'),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _isVerified ? const Color(0xFF2E7D32) : Colors.red,
+                        color: isUsed ? Colors.red.shade700 : (_isVerified ? const Color(0xFF2E7D32) : Colors.red),
                       ),
                     ),
                   ],
@@ -180,7 +197,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 style: GoogleFonts.poppins(color: Colors.grey.shade600),
               ),
               const SizedBox(height: 20),
-
               Container(
                 width: 200,
                 padding: const EdgeInsets.all(12),
@@ -191,25 +207,29 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 ),
                 child: Column(
                   children: [
-                    QrImageView(
-                      data: item.qrCode.isNotEmpty ? item.qrCode : 'VALID_TICKET',
-                      version: QrVersions.auto,
-                      size: 160.0,
+                    ColorFiltered(
+                      colorFilter: isUsed
+                          ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
+                          : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                      child: QrImageView(
+                        data: item.qrCode.isNotEmpty ? item.qrCode : 'VALID_TICKET',
+                        version: QrVersions.auto,
+                        size: 160.0,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Tunjukkan QR ini ke Petugas',
+                      isUsed ? 'Tiket Telah Hangus' : 'Tunjukkan QR ini ke Petugas',
                       style: GoogleFonts.poppins(
                         fontSize: 11,
-                        color: Colors.grey,
+                        color: isUsed ? Colors.red.shade700 : Colors.grey,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
               if (_displayHash.isNotEmpty || item.hash.isNotEmpty) ...[
                 Text(
                   'Hash Tiket (Blockchain):',
@@ -231,7 +251,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               Text(
                 'Jumlah Tiket: ${item.jumlahTiket} Orang',
                 style: GoogleFonts.poppins(
@@ -258,7 +277,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
   Widget _buildTixIdListView(Color primaryColor) {
     if (_listPesanan.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _loadAllTickets,
+        onRefresh: _loadUserTickets,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Container(
@@ -286,29 +305,34 @@ class _ETicketScreenState extends State<ETicketScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadAllTickets,
+      onRefresh: _loadUserTickets,
       child: ListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: _listPesanan.length,
         itemBuilder: (context, index) {
           final item = _listPesanan[index];
+          final bool isUsed = item.isUsed; // 👈 Status tiket dari database
+
           return InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ETicketScreen(
-                    pesanan: item,
-                    hashTiket: item.hash,
-                  ),
-                ),
-              );
-            },
+            // 🛑 Jika sudah digunakan, fungsi onTap dimatikan (tidak bisa diklik)
+            onTap: isUsed
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ETicketScreen(
+                          pesanan: item,
+                          hashTiket: item.hash,
+                        ),
+                      ),
+                    );
+                  },
             borderRadius: BorderRadius.circular(20),
             child: Container(
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.white, // 👈 Latar belakang kartu tetap putih bersih
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -329,19 +353,27 @@ class _ETicketScreenState extends State<ETicketScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Terverifikasi ✓',
+                              isUsed ? 'Sudah Digunakan (Hangus)' : 'Terverifikasi ✓',
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2E7D32),
+                                color: isUsed ? Colors.red.shade700 : const Color(0xFF2E7D32),
                               ),
                             ),
-                            Text(
-                              'Lunas',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
+                            // Badge elegan penanda status di sisi kanan atas card
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isUsed ? Colors.red.shade50 : primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                isUsed ? 'HANGUS' : 'Lunas',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isUsed ? Colors.red.shade700 : primaryColor,
+                                ),
                               ),
                             ),
                           ],
@@ -352,6 +384,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
                         Text(
@@ -364,7 +397,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       ],
                     ),
                   ),
-
                   Row(
                     children: [
                       const SizedBox(
@@ -416,15 +448,19 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       ),
                     ],
                   ),
-
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        QrImageView(
-                          data: item.qrCode,
-                          version: QrVersions.auto,
-                          size: 70.0,
+                        ColorFiltered(
+                          colorFilter: isUsed
+                              ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
+                              : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                          child: QrImageView(
+                            data: item.qrCode,
+                            version: QrVersions.auto,
+                            size: 70.0,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -436,6 +472,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
                                 ),
                               ),
                               Text(
@@ -443,7 +480,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: primaryColor,
+                                  color: isUsed ? Colors.grey : primaryColor,
                                 ),
                               ),
                             ],

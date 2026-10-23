@@ -24,6 +24,7 @@ class BlockchainService {
   }
 
   static Future<String> tambahBlok({
+    String? userId, // 👈 1. Tambahkan parameter opsional userId di sini
     required String ticketId,
     required String namaWisata,
     required String tanggalKunjungan,
@@ -45,6 +46,7 @@ class BlockchainService {
       );
 
       final newBlock = BlockchainModel(
+        userId: userId, // 👈 2. Masukkan userId ke dalam model blok
         ticketId: ticketId,
         namaWisata: namaWisata,
         tanggalKunjungan: tanggalKunjungan,

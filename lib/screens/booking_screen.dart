@@ -154,8 +154,9 @@ class _BookingScreenState extends State<BookingScreen> {
         'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user?.id ?? "guest"}&wisata=${widget.wisata.nama}';
 
     try {
-      // PROSES SIMPAN CHUKUP DARI SINI (SISTEM BLOCKCHAIN TERINTEGRASI)
+      // 🛠️ PERBAIKAN: Pastikan fungsi tambahBlok di BlockchainService menerima parameter `userId`
       await BlockchainService.tambahBlok(
+        userId: user?.id, // 👈 Mengirimkan ID user yang sedang login agar tidak NULL di database
         ticketId: qrCodeId,
         namaWisata: widget.wisata.nama,
         tanggalKunjungan: tanggalFormatted,
@@ -163,7 +164,7 @@ class _BookingScreenState extends State<BookingScreen> {
         totalHarga: _calculateTotalPrice(),
       );
 
-      debugPrint("Berhasil menyimpan tiket secara tunggal ke Supabase!");
+      debugPrint("Berhasil menyimpan tiket dengan user_id ke Supabase!");
     } catch (e) {
       debugPrint("Gagal memproses pembayaran: $e");
     } finally {

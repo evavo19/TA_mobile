@@ -1,5 +1,6 @@
 class PesananModel {
   final dynamic id;
+  final String? userId; // 👈 Tambahan user_id
   final String qrCode;
   final String namaWisata;
   final String tanggalKunjungan;
@@ -8,9 +9,11 @@ class PesananModel {
   final String previousHash;
   final String hash;
   final String createdAt;
+  final bool isUsed; // 👈 Tambahan status penggunaan tiket (menyesuaikan kolom 'status' di database)
 
   PesananModel({
     this.id,
+    this.userId,
     required this.qrCode,
     required this.namaWisata,
     required this.tanggalKunjungan,
@@ -19,11 +22,13 @@ class PesananModel {
     this.previousHash = '',
     this.hash = '',
     required this.createdAt,
+    this.isUsed = false, // 👈 Default false (belum digunakan)
   });
 
   factory PesananModel.fromMap(Map<String, dynamic> map) {
     return PesananModel(
       id: map['id'],
+      userId: map['user_id'], // 👈 Mapping dari Supabase
       qrCode: map['ticket_id'] ?? map['qr_code'] ?? '',
       namaWisata: map['nama_wisata'] ?? '',
       tanggalKunjungan: map['tanggal_kunjungan'] ?? '',
@@ -36,11 +41,13 @@ class PesananModel {
       previousHash: map['previous_hash'] ?? '',
       hash: map['hash'] ?? '',
       createdAt: map['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+      isUsed: map['status'] ?? map['is_used'] ?? false, // 👈 Membaca status boolean dari kolom 'status' database
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'user_id': userId, // 👈 Disimpan ke Supabase
       'ticket_id': qrCode,
       'nama_wisata': namaWisata,
       'tanggal_kunjungan': tanggalKunjungan,
@@ -49,6 +56,7 @@ class PesananModel {
       'previous_hash': previousHash,
       'hash': hash,
       'created_at': createdAt,
+      'status': isUsed, // 👈 Disimpan ke kolom 'status' database Supabase
     };
   }
 }

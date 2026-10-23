@@ -4,6 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'register_screen.dart';
+import '../screens/scan_ticket_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -112,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: Text(
-                      isSuccess ? 'Lanjut ke Utama' : 'Coba Lagi',
+                      isSuccess ? 'Lanjutkan' : 'Coba Lagi',
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -155,28 +156,60 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Verifikasi login langsung ke Supabase Auth
+      // 1. Login menggunakan Supabase Auth
       final response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      if (mounted && response.user != null) {
-        _showCustomDialog(
-          title: 'Login Berhasil',
-          message: 'Selamat datang kembali di LelunganJogja!',
-          isSuccess: true,
-          onSuccessPressed: () {
+      if (response.user != null) {
+        String userId = response.user!.id;
+        String userRole = 'user'; // Default role
+
+        // Opsi A: Cek role dari User Metadata Auth terlebih dahulu
+        final metadataRole = response.user!.userMetadata?['role'];
+        if (metadataRole != null && metadataRole.toString().isNotEmpty) {
+          userRole = metadataRole.toString().trim().toLowerCase();
+        } else {
+          // Opsi B: Jika metadata kosong, fallback mengambil dari tabel profiles[cite: 1, 2]
+          try {
+            final profileResponse = await _supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (profileResponse != null && profileResponse['role'] != null) {
+              userRole = profileResponse['role'].toString().trim().toLowerCase();
+            }
+          } catch (e) {
+            debugPrint("Gagal fetch role dari profiles: $e");
+          }
+        }
+
+        debugPrint("DEBUG: Login Berhasil | Email: $email | Role terdeteksi: $userRole");
+
+        if (mounted) {
+          // 2. Navigasi berbasis Role (Menggunakan pushAndRemoveUntil agar bersih)[cite: 1]
+          if (userRole == 'petugas' || userRole == 'admin') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ScanTicketScreen(),
+              ),
+              (route) => false,
+            );
+          } else {
             Navigator.pushReplacementNamed(context, '/main');
-          },
-        );
+          }
+        }
       }
     } on AuthException catch (_) {
       if (mounted) {
         _showCustomDialog(
           title: 'Gagal Masuk',
           message:
-              'Email belum terdaftar atau password salah! Silakan periksa kembali atau daftar akun terlebih dahulu.',
+              'Email belum terdaftar atau password salah! Silakan periksa kembali.',
           isSuccess: false,
         );
       }
@@ -214,18 +247,47 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (authenticated && mounted) {
-        // Cek apakah ada sesi login aktif yang tersimpan dari Supabase
         final session = _supabase.auth.currentSession;
 
         if (session != null) {
-          // Jika pengguna pernah login sebelumnya, langsung meluncur ke /main
-          Navigator.pushReplacementNamed(context, '/main');
+          final user = session.user;
+          String userRole = 'user';
+
+          final metadataRole = user.userMetadata?['role'];
+          if (metadataRole != null && metadataRole.toString().isNotEmpty) {
+            userRole = metadataRole.toString().trim().toLowerCase();
+          } else {
+            try {
+              final profileResponse = await _supabase
+                  .from('profiles')
+                  .select('role')
+                  .eq('id', user.id)
+                  .maybeSingle();
+
+              if (profileResponse != null && profileResponse['role'] != null) {
+                userRole = profileResponse['role'].toString().trim().toLowerCase();
+              }
+            } catch (e) {
+              debugPrint("Error biometric fetch role: $e");
+            }
+          }
+
+          if (userRole == 'petugas' || userRole == 'admin') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ScanTicketScreen(),
+              ),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushReplacementNamed(context, '/main');
+          }
         } else {
-          // Jika belum pernah login sama sekali, tampilkan petunjuk dialog
           _showCustomDialog(
             title: 'Belum Ada Akun Aktif',
             message:
-                'Silakan login manual menggunakan Email & Password terlebih dahulu untuk mengaktifkan fitur sidik jari.',
+                'Silakan login manual menggunakan Email & Password terlebih dahulu.',
             isSuccess: false,
           );
         }

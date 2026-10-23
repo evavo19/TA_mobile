@@ -3,12 +3,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/login_screen.dart';
-import 'auth/splas_screen.dart'; // Sesuaikan jika nama filenya splash_screen.dart
+import 'auth/splas_screen.dart';
 import 'screens/main_screen.dart';
+import 'screens/scan_ticket_screen.dart'; // 👈 Import halaman scan petugas
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(
@@ -19,8 +19,6 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-final supabase = Supabase.instance.client;
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -30,11 +28,12 @@ class MyApp extends StatelessWidget {
       title: 'Pemesanan Tiket Wisata Jogja',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      initialRoute: '/', // Rute pertama kali buka adalah SplashScreen
+      initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/main': (context) => const MainScreen(),
+        '/scan': (context) => const ScanTicketScreen(), // 👈 Daftarkan rute scan
       },
     );
   }

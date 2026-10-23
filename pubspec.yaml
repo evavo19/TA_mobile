@@ -21,6 +21,7 @@ dependencies:
   local_auth: ^2.1.6 # Login Biometric (Fingerprint/Face ID)
   permission_handler: ^11.3.1 # Manajemen Izin Perangkat
   flutter_local_notifications: ^17.2.2 # Notifikasi Lokal
+  qr_flutter: ^4.1.0 # Paket QR Code Asli (Bisa Di-scan)
 
   # Paket Peta LBS (OpenStreetMap - Web/Map API)
   flutter_map: ^6.1.0
@@ -40,7 +41,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
 
 flutter:

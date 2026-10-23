@@ -41,7 +41,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   void dispose() {
-    // Pastikan banner overlay tidak tertinggal saat halaman ditutup
     _overlayEntry?.remove();
     _overlayEntry = null;
     super.dispose();
@@ -82,7 +81,6 @@ class _BookingScreenState extends State<BookingScreen> {
     return hargaKoin * _jumlahTiket;
   }
 
-  // Banner notifikasi di dalam aplikasi (bukan notifikasi sistem Android)
   void _showTopNotification(String title, String message) {
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -151,60 +149,59 @@ class _BookingScreenState extends State<BookingScreen> {
     String tanggalFormatted =
         '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
 
-    final String qrCodeId = 'TIC-${DateTime.now().millisecondsSinceEpoch}';
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
-    // 1. Buat Objek Pesanan Model
+    final String qrCodeId = 'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user?.id ?? "guest"}&wisata=${widget.wisata.nama}';
+
+    String generatedHash = '';
+    try {
+      // 1. Generate Hash Blockchain
+      generatedHash = await BlockchainService.tambahBlok(
+        ticketId: qrCodeId,
+        namaWisata: widget.wisata.nama,
+        tanggalKunjungan: tanggalFormatted,
+        jumlahTiket: _jumlahTiket,
+        totalHarga: _calculateTotalPrice(),
+      );
+    } catch (e) {
+      debugPrint("Gagal generate blockchain: $e");
+    }
+
     final pesanan = PesananModel(
-      userId: user != null ? user.id : 'user_temp_id',
-      wisataId: widget.wisata.id,
+      qrCode: qrCodeId,
       namaWisata: widget.wisata.nama,
       tanggalKunjungan: tanggalFormatted,
       jumlahTiket: _jumlahTiket,
       totalHarga: _calculateTotalPrice(),
-      mataUang: widget.selectedCurrency,
-      metodePembayaran: _selectedPayment,
-      status: 'Lunas',
-      qrCode: qrCodeId,
-      createdAt: DateTime.now(),
+      previousHash: '',
+      hash: generatedHash,
+      createdAt: DateTime.now().toIso8601String(),
     );
 
-    String generatedHash = '';
     try {
-      // 2. Simpan ke Blockchain Service
-      generatedHash = await BlockchainService.tambahBlok(
-        ticketId: pesanan.qrCode,
-        namaWisata: pesanan.namaWisata,
-        tanggalKunjungan: pesanan.tanggalKunjungan,
-        jumlahTiket: pesanan.jumlahTiket,
-        totalHarga: pesanan.totalHarga,
-      );
-
-      // 3. Simpan ke tabel 'pesanan' di Database Supabase menggunakan toMap()
-      await supabase.from('pesanan').insert(pesanan.toMap());
+      // 2. Simpan ke tabel 'blockchain_tiket' di Supabase
+      await supabase.from('blockchain_tiket').insert(pesanan.toMap());
+      debugPrint("Berhasil menyimpan ke tabel blockchain_tiket!");
     } catch (e) {
-      debugPrint("Gagal memproses pembayaran / blockchain: $e");
+      debugPrint("Gagal menyimpan ke Supabase: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
 
-    // Notifikasi sistem Android (status bar & laci notifikasi)
     NotificationService.show(
       title: 'Pembayaran Berhasil',
-      body:
-          'Tiket ${pesanan.namaWisata} (${pesanan.jumlahTiket} orang) untuk tanggal ${pesanan.tanggalKunjungan} sudah dikonfirmasi.',
+      body: 'Tiket ${pesanan.namaWisata} (${pesanan.jumlahTiket} orang) berhasil dipesan!',
     );
 
     if (mounted) {
-      // Banner di dalam aplikasi (paling atas layar)
       _showTopNotification(
         'Pembayaran Berhasil',
-        'Tiket ${pesanan.namaWisata} berhasil dipesan!',
+        'Tiket berhasil disimpan!',
       );
 
-      // Langsung direct ke halaman E-Tiket setelah jeda singkat
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      // Arahkan langsung ke halaman detail e-ticket dengan hash blockchain
+      Future.delayed(const Duration(milliseconds: 800), () {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
@@ -229,11 +226,7 @@ class _BookingScreenState extends State<BookingScreen> {
         backgroundColor: primaryColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.white,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -280,10 +273,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               width: 70,
                               height: 70,
                               color: Colors.grey.shade200,
-                              child: const Icon(
-                                Icons.broken_image_outlined,
-                                color: Colors.grey,
-                              ),
+                              child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
                             ),
                           ),
                         ),
@@ -332,10 +322,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     onTap: () => _selectDate(context),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -350,18 +337,11 @@ class _BookingScreenState extends State<BookingScreen> {
                                 : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} ${_isWeekend(_selectedDate!) ? "(Weekend)" : "(Weekday)"}',
                             style: GoogleFonts.poppins(
                               fontSize: 14,
-                              color: _selectedDate == null
-                                  ? Colors.grey
-                                  : Colors.black87,
-                              fontWeight: _selectedDate == null
-                                  ? FontWeight.normal
-                                  : FontWeight.bold,
+                              color: _selectedDate == null ? Colors.grey : Colors.black87,
+                              fontWeight: _selectedDate == null ? FontWeight.normal : FontWeight.bold,
                             ),
                           ),
-                          const Icon(
-                            Icons.calendar_month_rounded,
-                            color: primaryColor,
-                          ),
+                          const Icon(Icons.calendar_month_rounded, color: primaryColor),
                         ],
                       ),
                     ),
@@ -379,10 +359,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -391,25 +368,17 @@ class _BookingScreenState extends State<BookingScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Jumlah Orang',
-                          style: GoogleFonts.poppins(fontSize: 14),
-                        ),
+                        Text('Jumlah Orang', style: GoogleFonts.poppins(fontSize: 14)),
                         Row(
                           children: [
                             IconButton(
-                              onPressed: _jumlahTiket > 1
-                                  ? () => setState(() => _jumlahTiket--)
-                                  : null,
+                              onPressed: _jumlahTiket > 1 ? () => setState(() => _jumlahTiket--) : null,
                               icon: const Icon(Icons.remove_circle_outline),
                               color: primaryColor,
                             ),
                             Text(
                               '$_jumlahTiket',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             IconButton(
                               onPressed: () => setState(() => _jumlahTiket++),
@@ -442,9 +411,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isSelected
-                                ? primaryColor
-                                : Colors.grey.shade300,
+                            color: isSelected ? primaryColor : Colors.grey.shade300,
                             width: isSelected ? 1.8 : 1,
                           ),
                         ),
@@ -453,25 +420,18 @@ class _BookingScreenState extends State<BookingScreen> {
                           groupValue: _selectedPayment,
                           value: method['name']!,
                           onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedPayment = val);
-                            }
+                            if (val != null) setState(() => _selectedPayment = val);
                           },
                           title: Text(
                             method['name']!,
                             style: GoogleFonts.poppins(
                               fontSize: 14,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                           subtitle: Text(
                             method['desc']!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.grey,
-                            ),
+                            style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
                           ),
                         ),
                       );
@@ -502,13 +462,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Total Pembayaran',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
+                        Text('Total Pembayaran', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                         Text(
                           widget.selectedCurrency == 'IDR'
                               ? '${widget.currencySymbol}${_calculateTotalPrice().toStringAsFixed(0)}'
@@ -526,24 +480,17 @@ class _BookingScreenState extends State<BookingScreen> {
                     height: 48,
                     width: 160,
                     child: ElevatedButton(
-                      onPressed: (_selectedDate == null || _isLoading)
-                          ? null
-                          : _prosesPembayaran,
+                      onPressed: (_selectedDate == null || _isLoading) ? null : _prosesPembayaran,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                       ),
                       child: _isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
                           : Text(
                               'Bayar Sekarang',

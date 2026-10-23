@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../features/chatbot.dart';
 import '../features/kompas.dart';
 import 'eticket_screen.dart';
@@ -109,9 +110,19 @@ class _MainScreenState extends State<MainScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(Icons.home_rounded, 'Beranda', 0, primaryColor),
-                _buildNavItem(Icons.confirmation_number_rounded, 'Tiket Saya', 1, primaryColor),
+                _buildNavItem(
+                  Icons.confirmation_number_rounded,
+                  'Tiket Saya',
+                  1,
+                  primaryColor,
+                ),
                 const SizedBox(width: 48), // Spasi tengah untuk tombol kompas
-                _buildNavItem(Icons.smart_toy_rounded, 'Asisten AI', 2, primaryColor),
+                _buildNavItem(
+                  Icons.smart_toy_rounded,
+                  'Asisten AI',
+                  2,
+                  primaryColor,
+                ),
                 _buildNavItem(Icons.person_rounded, 'Profil', 3, primaryColor),
               ],
             ),
@@ -122,11 +133,19 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   // Item navigasi custom supaya sejajar dengan notch
-  Widget _buildNavItem(IconData icon, String label, int index, Color primaryColor) {
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    int index,
+    Color primaryColor,
+  ) {
     final isSelected = _index == index;
 
     return InkWell(
       onTap: () => setState(() => _index = index),
+      splashColor: Colors.transparent, // Menghilangkan efek gelombang sentuhan
+      highlightColor:
+          Colors.transparent, // Menghilangkan kotak abu-abu saat diklik
       child: Padding(
         padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
         child: Column(

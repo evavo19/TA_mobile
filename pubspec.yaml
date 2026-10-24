@@ -33,7 +33,7 @@ dependencies:
   latlong2: ^0.9.0
 
   # Sensor GPS Device, AI Chatbot Gemini, & Environment Variables:
-  geolocator: ^10.1.0 # Sensor GPS Device Native
+  geolocator: ^13.0.0 # Sensor GPS Device Native
   google_generative_ai: ^0.4.0 # Gemini API
   url_launcher: ^6.2.5
   flutter_dotenv: ^5.1.0 # Paket untuk membaca file .env

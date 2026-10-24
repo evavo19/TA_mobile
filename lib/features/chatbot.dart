@@ -93,7 +93,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         if (permission == LocationPermission.whileInUse ||
             permission == LocationPermission.always) {
           Position pos = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+            ),
           );
           if (!mounted) return;
           setState(() {

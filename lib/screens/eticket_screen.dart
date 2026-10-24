@@ -140,12 +140,17 @@ class _ETicketScreenState extends State<ETicketScreen> {
     }
   }
 
-  // Fungsi helper untuk mendeteksi mata uang secara dinamis berdasarkan nominal harga
+  // Mata uang dibaca dari kolom 'mata_uang' di database (sesuai pilihan user saat memesan)
   String _dapatkanMataUang(PesananModel item) {
-    if (item.totalHarga < 1000) {
-      return 'JPY'; // Menyesuaikan jika nominal kecil (seperti JPY/USD/EUR)
-    }
-    return 'IDR';
+    final kode = item.mataUang.trim().toUpperCase();
+    return kode.isEmpty ? 'IDR' : kode;
+  }
+
+  // IDR dan JPY tanpa desimal, USD dan EUR dua desimal
+  String _formatTotal(PesananModel item) {
+    final kode = _dapatkanMataUang(item);
+    final desimal = (kode == 'IDR' || kode == 'JPY') ? 0 : 2;
+    return '$kode ${item.totalHarga.toStringAsFixed(desimal)}';
   }
 
   @override
@@ -166,13 +171,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          if (widget.pesanan == null)
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadUserTickets,
-            ),
-        ],
       ),
       body: _isLoading && widget.pesanan == null
           ? const Center(child: CircularProgressIndicator())
@@ -185,7 +183,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
   Widget _buildDirectTicketView(Color primaryColor) {
     final item = _directPesanan!;
     final bool isUsed = item.isUsed;
-    final String currency = _dapatkanMataUang(item);
 
     return Center(
       child: SingleChildScrollView(
@@ -333,7 +330,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Total: $currency ${item.totalHarga.toStringAsFixed(0)}',
+                'Total: ${_formatTotal(item)}',
                 style: GoogleFonts.poppins(
                   color: primaryColor,
                   fontWeight: FontWeight.bold,
@@ -392,7 +389,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
         itemBuilder: (context, index) {
           final item = _listPesanan[index];
           final bool isUsed = item.isUsed;
-          final String currency = _dapatkanMataUang(item);
 
           return InkWell(
             // 🛑 Mencegah klik apabila tiket sudah hangus
@@ -563,7 +559,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 ),
                               ),
                               Text(
-                                'Total: $currency ${item.totalHarga.toStringAsFixed(0)}',
+                                'Total: ${_formatTotal(item)}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,

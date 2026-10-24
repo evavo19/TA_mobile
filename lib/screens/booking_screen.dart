@@ -80,6 +80,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _showTopNotification(String title, String message) {
+    _overlayEntry?.remove();
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         top: MediaQuery.of(context).padding.top + 10,
@@ -139,23 +140,42 @@ class _BookingScreenState extends State<BookingScreen> {
     });
   }
 
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 5),
+        content: Text(message, style: GoogleFonts.poppins(fontSize: 12)),
+      ),
+    );
+  }
+
   Future<void> _prosesPembayaran() async {
     if (_selectedDate == null || _isLoading) return;
-
-    setState(() => _isLoading = true);
-
-    String tanggalFormatted =
-        '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
 
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
+    // Wajib login, kalau tidak insert akan ditolak oleh RLS
+    if (user == null) {
+      _showErrorSnackBar('Silakan login terlebih dahulu sebelum memesan tiket.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final String tanggalFormatted =
+        '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
+
     final String qrCodeId =
-        'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user?.id ?? "guest"}&wisata=${widget.wisata.nama}';
+        'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user.id}&wisata=${Uri.encodeComponent(widget.wisata.nama)}';
+
+    bool berhasil = false;
 
     try {
       await BlockchainService.tambahBlok(
-        userId: user?.id,
+        userId: user.id,
         ticketId: qrCodeId,
         namaWisata: widget.wisata.nama,
         tanggalKunjungan: tanggalFormatted,
@@ -163,30 +183,35 @@ class _BookingScreenState extends State<BookingScreen> {
         totalHarga: _calculateTotalPrice(),
         mataUang: widget.selectedCurrency,
       );
-
-      debugPrint("Berhasil menyimpan tiket dengan user_id dan mata uang ${widget.selectedCurrency} ke Supabase!");
+      berhasil = true;
+      debugPrint("Berhasil menyimpan tiket ke Supabase!");
+    } on PostgrestException catch (e) {
+      debugPrint("Gagal menyimpan tiket (Postgrest): ${e.code} - ${e.message}");
+      _showErrorSnackBar('Gagal menyimpan tiket: ${e.message}');
     } catch (e) {
       debugPrint("Gagal memproses pembayaran: $e");
+      _showErrorSnackBar('Pembayaran gagal: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+
+    // Jangan lanjut kalau penyimpanan gagal
+    if (!berhasil || !mounted) return;
 
     NotificationService.show(
       title: 'Pembayaran Berhasil',
       body: 'Tiket ${widget.wisata.nama} ($_jumlahTiket orang) berhasil dipesan!',
     );
 
-    if (mounted) {
-      _showTopNotification(
-        'Pembayaran Berhasil',
-        'Tiket berhasil disimpan!',
-      );
+    _showTopNotification(
+      'Pembayaran Berhasil',
+      'Tiket berhasil disimpan!',
+    );
 
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (!mounted) return;
-        Navigator.pop(context);
-      });
-    }
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      Navigator.pop(context, true); // true = tiket baru berhasil dibuat
+    });
   }
 
   @override
@@ -226,7 +251,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: Colors.black.withOpacity(0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -388,41 +413,23 @@ class _BookingScreenState extends State<BookingScreen> {
                             width: isSelected ? 1.8 : 1,
                           ),
                         ),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            setState(() => _selectedPayment = method['name']!);
+                        child: RadioListTile<String>(
+                          activeColor: primaryColor,
+                          groupValue: _selectedPayment,
+                          value: method['name']!,
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedPayment = val);
                           },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                                  color: isSelected ? primaryColor : Colors.grey,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        method['name']!,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        ),
-                                      ),
-                                      Text(
-                                        method['desc']!,
-                                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                          title: Text(
+                            method['name']!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
+                          ),
+                          subtitle: Text(
+                            method['desc']!,
+                            style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
                           ),
                         ),
                       );
@@ -439,7 +446,7 @@ class _BookingScreenState extends State<BookingScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
+                  color: Colors.black.withOpacity(0.06),
                   blurRadius: 10,
                   offset: const Offset(0, -4),
                 ),

@@ -6,6 +6,7 @@ class PesananModel {
   final String tanggalKunjungan;
   final int jumlahTiket;
   final double totalHarga;
+  final String mataUang; // 👈 Mata uang yang dipilih user (IDR, USD, EUR, JPY)
   final String previousHash;
   final String hash;
   final String createdAt;
@@ -19,6 +20,7 @@ class PesananModel {
     required this.tanggalKunjungan,
     required this.jumlahTiket,
     required this.totalHarga,
+    this.mataUang = 'IDR', // 👈 Default IDR untuk tiket lama
     this.previousHash = '',
     this.hash = '',
     required this.createdAt,
@@ -26,6 +28,8 @@ class PesananModel {
   });
 
   factory PesananModel.fromMap(Map<String, dynamic> map) {
+    final rawMataUang = (map['mata_uang'] ?? 'IDR').toString().trim();
+
     return PesananModel(
       id: map['id'],
       userId: map['user_id'], // 👈 Mapping dari Supabase
@@ -38,10 +42,11 @@ class PesananModel {
       totalHarga: map['total_harga'] != null
           ? double.parse(map['total_harga'].toString())
           : 0.0,
+      mataUang: rawMataUang.isEmpty ? 'IDR' : rawMataUang.toUpperCase(),
       previousHash: map['previous_hash'] ?? '',
       hash: map['hash'] ?? '',
       createdAt: map['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-      isUsed: map['status'] ?? map['is_used'] ?? false, // 👈 Membaca status boolean dari kolom 'status' database
+      isUsed: (map['status'] ?? map['is_used']) == true, // 👈 Membaca status boolean dari kolom 'status' database
     );
   }
 
@@ -53,6 +58,7 @@ class PesananModel {
       'tanggal_kunjungan': tanggalKunjungan,
       'jumlah_tiket': jumlahTiket,
       'total_harga': totalHarga,
+      'mata_uang': mataUang,
       'previous_hash': previousHash,
       'hash': hash,
       'created_at': createdAt,

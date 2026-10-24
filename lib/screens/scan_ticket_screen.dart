@@ -34,11 +34,12 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
 
   Future<void> _logout(BuildContext context) async {
     final supabase = Supabase.instance.client;
+    // Ambil navigator SEBELUM await, supaya tidak memakai context setelah async gap
+    final navigator = Navigator.of(context);
     try {
       await supabase.auth.signOut();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-      }
+      if (!mounted) return;
+      navigator.pushNamedAndRemoveUntil('/', (route) => false);
     } catch (e) {
       debugPrint("Gagal logout: $e");
     }
@@ -68,7 +69,12 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
           .from('blockchain_tiket')
           .select()
           .ilike('ticket_id', '%$qrData%')
+          .limit(
+            1,
+          ) // cegah error "multiple rows" jika ada lebih dari satu yang cocok
           .maybeSingle();
+
+      if (!mounted) return;
 
       if (response == null) {
         setState(() {
@@ -98,6 +104,8 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
           .update({'status': true})
           .eq('id', varId);
 
+      if (!mounted) return;
+
       response['status'] = true;
 
       setState(() {
@@ -107,6 +115,7 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
         _scannedTicketData = response;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _isSuccess = false;
@@ -168,7 +177,10 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
             const SizedBox(height: 6),
             Text(
               'Arahkan kamera ke QR Code untuk memvalidasi dan mengubah status tiket secara otomatis.',
-              style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -184,7 +196,9 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                 child: MobileScanner(
                   controller: cameraController,
                   onDetect: (capture) {
-                    if (_isProcessing || _isLoading) return; // Mencegah scan bertubi-tubi
+                    if (_isProcessing || _isLoading) {
+                      return; // Mencegah scan bertubi-tubi
+                    }
                     final List<Barcode> barcodes = capture.barcodes;
                     for (final barcode in barcodes) {
                       if (barcode.rawValue != null) {
@@ -206,7 +220,9 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
               decoration: InputDecoration(
                 labelText: 'Data Ticket ID / URL',
                 hintText: 'Hasil scan QR atau masukkan ID',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 filled: true,
                 fillColor: Colors.white,
               ),
@@ -219,10 +235,15 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                   child: SizedBox(
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : () => _validasiDanUbahStatus(_controller.text.trim()),
+                      onPressed: _isLoading
+                          ? null
+                          : () =>
+                                _validasiDanUbahStatus(_controller.text.trim()),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
                       ),
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
@@ -242,10 +263,14 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                   // Tombol reset untuk scan tiket berikutnya
                   IconButton(
                     onPressed: _resetScanner,
-                    icon: const Icon(Icons.refresh_rounded, color: primaryColor, size: 30),
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: primaryColor,
+                      size: 30,
+                    ),
                     tooltip: 'Scan Tiket Lain',
                   ),
-                ]
+                ],
               ],
             ),
 
@@ -255,7 +280,9 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _isSuccess ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                  color: _isSuccess
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFFFEBEE),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: _isSuccess ? const Color(0xFF2E7D32) : Colors.red,
@@ -267,8 +294,12 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                     Row(
                       children: [
                         Icon(
-                          _isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
-                          color: _isSuccess ? const Color(0xFF2E7D32) : Colors.red,
+                          _isSuccess
+                              ? Icons.check_circle_rounded
+                              : Icons.error_rounded,
+                          color: _isSuccess
+                              ? const Color(0xFF2E7D32)
+                              : Colors.red,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -277,7 +308,9 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: _isSuccess ? const Color(0xFF2E7D32) : Colors.red.shade800,
+                              color: _isSuccess
+                                  ? const Color(0xFF2E7D32)
+                                  : Colors.red.shade800,
                             ),
                           ),
                         ),
@@ -285,9 +318,22 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                     ),
                     if (_scannedTicketData != null) ...[
                       const Divider(height: 20),
-                      Text('Wisata: ${_scannedTicketData!['nama_wisata'] ?? '-'}', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                      Text('Tanggal: ${_scannedTicketData!['tanggal_kunjungan'] ?? '-'}', style: GoogleFonts.poppins(fontSize: 12)),
-                      Text('Status Database: TRUE (Hangus)', style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Wisata: ${_scannedTicketData!['nama_wisata'] ?? '-'}',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Tanggal: ${_scannedTicketData!['tanggal_kunjungan'] ?? '-'}',
+                        style: GoogleFonts.poppins(fontSize: 12),
+                      ),
+                      Text(
+                        'Status Database: TRUE (Hangus)',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ],
                 ),

@@ -197,7 +197,10 @@ class _ETicketScreenState extends State<ETicketScreen> {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.grey.shade200),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+              ),
             ],
           ),
           child: Column(
@@ -414,7 +417,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -450,7 +453,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                               decoration: BoxDecoration(
                                 color: isUsed
                                     ? Colors.red.shade50
-                                    : primaryColor.withOpacity(0.1),
+                                    : primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(

@@ -154,17 +154,17 @@ class _BookingScreenState extends State<BookingScreen> {
         'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user?.id ?? "guest"}&wisata=${widget.wisata.nama}';
 
     try {
-      // 🛠️ PERBAIKAN: Pastikan fungsi tambahBlok di BlockchainService menerima parameter `userId`
       await BlockchainService.tambahBlok(
-        userId: user?.id, // 👈 Mengirimkan ID user yang sedang login agar tidak NULL di database
+        userId: user?.id,
         ticketId: qrCodeId,
         namaWisata: widget.wisata.nama,
         tanggalKunjungan: tanggalFormatted,
         jumlahTiket: _jumlahTiket,
         totalHarga: _calculateTotalPrice(),
+        mataUang: widget.selectedCurrency,
       );
 
-      debugPrint("Berhasil menyimpan tiket dengan user_id ke Supabase!");
+      debugPrint("Berhasil menyimpan tiket dengan user_id dan mata uang ${widget.selectedCurrency} ke Supabase!");
     } catch (e) {
       debugPrint("Gagal memproses pembayaran: $e");
     } finally {
@@ -182,7 +182,6 @@ class _BookingScreenState extends State<BookingScreen> {
         'Tiket berhasil disimpan!',
       );
 
-      // LANGSUNG TUTUP FORM PEMESANAN
       Future.delayed(const Duration(milliseconds: 800), () {
         if (!mounted) return;
         Navigator.pop(context);
@@ -227,7 +226,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -389,23 +388,41 @@ class _BookingScreenState extends State<BookingScreen> {
                             width: isSelected ? 1.8 : 1,
                           ),
                         ),
-                        child: RadioListTile<String>(
-                          activeColor: primaryColor,
-                          groupValue: _selectedPayment,
-                          value: method['name']!,
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedPayment = val);
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            setState(() => _selectedPayment = method['name']!);
                           },
-                          title: Text(
-                            method['name']!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                  color: isSelected ? primaryColor : Colors.grey,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        method['name']!,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                      Text(
+                                        method['desc']!,
+                                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          subtitle: Text(
-                            method['desc']!,
-                            style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
                           ),
                         ),
                       );
@@ -422,7 +439,7 @@ class _BookingScreenState extends State<BookingScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 10,
                   offset: const Offset(0, -4),
                 ),

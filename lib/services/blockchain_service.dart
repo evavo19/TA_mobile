@@ -24,12 +24,13 @@ class BlockchainService {
   }
 
   static Future<String> tambahBlok({
-    String? userId, // 👈 1. Tambahkan parameter opsional userId di sini
+    String? userId, // 👈 1. Parameter opsional userId
     required String ticketId,
     required String namaWisata,
     required String tanggalKunjungan,
     required int jumlahTiket,
     required double totalHarga,
+    required String mataUang, // 👈 2. Ditambahkan untuk menerima mata uang dari booking screen
   }) async {
     try {
       final String previousHash = await _getPreviousHash();
@@ -46,7 +47,7 @@ class BlockchainService {
       );
 
       final newBlock = BlockchainModel(
-        userId: userId, // 👈 2. Masukkan userId ke dalam model blok
+        userId: userId, // 👈 3. Masukkan userId ke dalam model blok
         ticketId: ticketId,
         namaWisata: namaWisata,
         tanggalKunjungan: tanggalKunjungan,
@@ -57,7 +58,11 @@ class BlockchainService {
         createdAt: createdAt,
       );
 
-      await _supabase.from('blockchain_tiket').insert(newBlock.toMap());
+      // Memasukkan data ke Map dan menyertakan mata_uang untuk disimpan ke Supabase
+      final mapData = newBlock.toMap();
+      mapData['mata_uang'] = mataUang;
+
+      await _supabase.from('blockchain_tiket').insert(mapData);
 
       debugPrint("Blok Tiket Berhasil Ditambahkan ke Blockchain! Hash: $currentHash");
       return currentHash;

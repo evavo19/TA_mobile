@@ -39,7 +39,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   // Fungsi untuk membaca sensor akselerometer (kemiringan HP)
   void _initSensor() {
-    _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
+   _accelerometerSubscription = accelerometerEventStream().listen((event) {
       if (!_isPlaying) return;
 
       setState(() {

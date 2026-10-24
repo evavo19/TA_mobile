@@ -13,6 +13,10 @@ dependencies:
   google_fonts: ^6.1.0 # Font Poppins
   supabase_flutter: ^2.8.0 # Supabase Database & Auth
 
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  cached_network_image: ^3.4.1
+
   # Icon bawaan Flutter
   cupertino_icons: ^1.0.8
 

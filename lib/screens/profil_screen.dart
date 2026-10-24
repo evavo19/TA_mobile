@@ -14,7 +14,11 @@ import '../models/user_model.dart';
 import '../services/gps_service.dart';
 
 class PlaceholderProfilScreen extends StatefulWidget {
-  const PlaceholderProfilScreen({super.key});
+  /// true jika halaman ini dibuka lewat Navigator.push (misal dari Detail Wisata),
+  /// sehingga perlu tombol kembali. Di tab Profil (MainScreen) biarkan false.
+  final bool showBackButton;
+
+  const PlaceholderProfilScreen({super.key, this.showBackButton = false});
 
   @override
   State<PlaceholderProfilScreen> createState() =>
@@ -1266,91 +1270,114 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                     left: 16,
                     right: 16,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      GestureDetector(
-                        onTap: _showImagePickerOptions,
-                        child: Stack(
-                          alignment: Alignment.bottomRight,
+                      SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircleAvatar(
-                              radius: 40,
-                              backgroundColor: Colors.white24,
-                              child: CircleAvatar(
-                                radius: 36,
-                                backgroundColor: Colors.white,
-                                backgroundImage: _getProfileImage(),
-                                child: _getProfileImage() == null
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 42,
-                                        color: primaryColor,
-                                      )
-                                    : null,
+                            GestureDetector(
+                              onTap: _showImagePickerOptions,
+                              child: Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 40,
+                                    backgroundColor: Colors.white24,
+                                    child: CircleAvatar(
+                                      radius: 36,
+                                      backgroundColor: Colors.white,
+                                      backgroundImage: _getProfileImage(),
+                                      child: _getProfileImage() == null
+                                          ? const Icon(
+                                              Icons.person,
+                                              size: 42,
+                                              color: primaryColor,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(5),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      size: 14,
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
+                            const SizedBox(height: 10),
+                            Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      (_currentUserModel?.fullName != null &&
+                                              _currentUserModel!
+                                                  .fullName
+                                                  .isNotEmpty)
+                                          ? _currentUserModel!.fullName
+                                          : (user?.userMetadata?['fullName'] ??
+                                                'Belum Diisi'),
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: _showEditProfileDialog,
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(4.0),
+                                      child: Icon(
+                                        Icons.edit,
+                                        size: 16,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                size: 14,
-                                color: primaryColor,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user?.email ??
+                                  (_currentUserModel?.email.isNotEmpty == true
+                                      ? _currentUserModel!.email
+                                      : 'Tidak ada email'),
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.white70,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                (_currentUserModel?.fullName != null &&
-                                        _currentUserModel!.fullName.isNotEmpty)
-                                    ? _currentUserModel!.fullName
-                                    : (user?.userMetadata?['fullName'] ??
-                                          'Belum Diisi'),
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                      if (widget.showBackButton)
+                        Positioned(
+                          top: -6,
+                          left: -8,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new,
+                              color: Colors.white,
+                              size: 20,
                             ),
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: _showEditProfileDialog,
-                              child: const Padding(
-                                padding: EdgeInsets.all(4.0),
-                                child: Icon(
-                                  Icons.edit,
-                                  size: 16,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ),
-                          ],
+                            onPressed: () => Navigator.pop(context),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        user?.email ??
-                            (_currentUserModel?.email.isNotEmpty == true
-                                ? _currentUserModel!.email
-                                : 'Tidak ada email'),
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: Colors.white70,
-                        ),
-                      ),
                     ],
                   ),
                 ),

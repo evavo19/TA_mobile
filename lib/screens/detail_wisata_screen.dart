@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/user_model.dart';
 import '../models/wisata_model.dart';
 import 'booking_screen.dart';
+import 'main_screen.dart';
 
 class DetailWisataScreen extends StatefulWidget {
   final WisataModel wisata;
@@ -14,6 +17,9 @@ class DetailWisataScreen extends StatefulWidget {
 }
 
 class _DetailWisataScreenState extends State<DetailWisataScreen> {
+  final _supabase = Supabase.instance.client;
+  bool _isCheckingProfile = false;
+
   // Pilihan Mata Uang & Kurs Konversi (Simulasi)
   String _selectedCurrency = 'IDR';
   final Map<String, double> _currencyRates = {
@@ -58,7 +64,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     if (offset == 0) return jamBukaWib;
 
     try {
-      // Mengambil angka jam dari string seperti "08.00 - 17.00 WIB"
       final parts = jamBukaWib.replaceAll('WIB', '').trim().split('-');
       if (parts.length != 2) return '$jamBukaWib ($_selectedTimeZone)';
 
@@ -68,7 +73,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       int startHour = int.parse(startStr.split(':')[0]) + offset;
       int endHour = int.parse(endStr.split(':')[0]) + offset;
 
-      // Normalisasi 24 jam
       startHour = (startHour + 24) % 24;
       endHour = (endHour + 24) % 24;
 
@@ -77,6 +81,188 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       return '${formatHour(startHour)}:00 - ${formatHour(endHour)}:00 $_selectedTimeZone';
     } catch (e) {
       return '$jamBukaWib ($_selectedTimeZone)';
+    }
+  }
+
+  // FUNGSI CEK KELENGKAPAN PROFIL SEBELUM PESAN TIKET
+  Future<void> _checkProfileAndBooking() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    setState(() => _isCheckingProfile = true);
+
+    try {
+      final response = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      setState(() => _isCheckingProfile = false);
+
+      bool isProfileIncomplete = false;
+
+      if (response == null) {
+        isProfileIncomplete = true;
+      } else {
+        // Pakai UserModel yang SAMA dengan halaman profil, supaya nama kolom
+        // di database pasti cocok (tidak menebak 'full_name' / 'fullName' dst).
+        final model = UserModel.fromJson(Map<String, dynamic>.from(response));
+        final String fullName = (model.fullName as String?) ?? '';
+        final String phone = (model.phone as String?) ?? '';
+        final String age = (model.age as String?) ?? '';
+        final String address = (model.address as String?) ?? '';
+
+        debugPrint(
+          'Cek profil -> nama:"$fullName" hp:"$phone" usia:"$age" alamat:"$address"',
+        );
+
+        if (fullName.trim().isEmpty ||
+            phone.trim().isEmpty ||
+            age.trim().isEmpty ||
+            address.trim().isEmpty) {
+          isProfileIncomplete = true;
+        }
+      }
+
+      if (!mounted) return;
+
+      if (isProfileIncomplete) {
+        // Tampilkan Pop-up Peringatan
+        showDialog(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withAlpha(30),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.amber,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Identitas Belum Lengkap',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Mohon lengkapi identitas diri Anda di halaman profil terlebih dahulu sebelum melakukan pemesanan tiket.',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      // TOMBOL BATAL: Menutup pop-up dan tetap di halaman detail wisata
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          child: Text(
+                            'Batal',
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // TOMBOL LENGKAPI PROFIL: Menutup pop-up lalu masuk ke halaman profil
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(dialogContext); // Tutup pop-up
+
+                            // Masuk ke halaman profil, tunggu sampai user kembali
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                // Buka MainScreen di tab Profil (index 3) supaya navbar tetap ada
+                                builder: (context) =>
+                                    const MainScreen(initialIndex: 3),
+                              ),
+                            );
+
+                            // Setelah kembali dari profil, cek ulang kelengkapannya
+                            if (!mounted) return;
+                            _checkProfileAndBooking();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1550B6),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Lengkapi Profil',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      } else {
+        // Jika sudah lengkap, lanjut ke halaman Booking
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookingScreen(
+              wisata: widget.wisata,
+              selectedCurrency: _selectedCurrency,
+              currencyRate: _currencyRates[_selectedCurrency] ?? 1.0,
+              currencySymbol: _currencySymbols[_selectedCurrency] ?? 'Rp ',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isCheckingProfile = false);
+      debugPrint('Error cek profil: $e');
     }
   }
 
@@ -113,20 +299,19 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Colors.black.withValues(alpha:0.4),
+                              Colors.black.withValues(alpha: 0.4),
                               Colors.transparent,
-                              Colors.black.withValues(alpha:0.2),
+                              Colors.black.withValues(alpha: 0.2),
                             ],
                           ),
                         ),
                       ),
                     ),
-                    // Tombol Back
                     Positioned(
                       top: 48,
                       left: 16,
                       child: CircleAvatar(
-                        backgroundColor: Colors.black.withValues(alpha:0.4),
+                        backgroundColor: Colors.black.withValues(alpha: 0.4),
                         child: IconButton(
                           icon: const Icon(
                             Icons.arrow_back_ios_new,
@@ -146,7 +331,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Kategori & Rating
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -194,10 +378,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 12),
-
-                      // Nama Wisata
                       Text(
                         widget.wisata.nama,
                         style: GoogleFonts.poppins(
@@ -206,15 +387,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           color: const Color(0xFF1E293B),
                         ),
                       ),
-
                       const SizedBox(height: 16),
                       const Divider(),
                       const SizedBox(height: 12),
 
-                      // Filter Konversi Mata Uang & Jam
+                      // Filter Mata Uang & Jam
                       Row(
                         children: [
-                          // Dropdown Mata Uang
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,8 +443,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-
-                          // Dropdown Zona Waktu
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,10 +493,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Jam Buka Terkonversi
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -352,10 +526,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
-                      // Deskripsi Wisata
                       Text(
                         'Deskripsi',
                         style: GoogleFonts.poppins(
@@ -374,8 +545,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           height: 1.6,
                         ),
                       ),
-
-                      const SizedBox(height: 100), // Spasi Bottom Bar
+                      const SizedBox(height: 100),
                     ],
                   ),
                 ),
@@ -383,7 +553,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
             ),
           ),
 
-          // Bottom Bar Harga & Tombol Pesan Tiket
+          // Bottom Bar Tombol Pesan
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -392,7 +562,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha:0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 16,
                     offset: const Offset(0, -4),
                   ),
@@ -401,7 +571,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
               child: SafeArea(
                 child: Row(
                   children: [
-                    // Informasi Harga
                     Expanded(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -425,28 +594,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                         ],
                       ),
                     ),
-
-                    // Tombol Pesan
                     SizedBox(
                       height: 48,
                       width: 160,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => BookingScreen(
-                                wisata: widget.wisata,
-                                selectedCurrency: _selectedCurrency,
-                                currencyRate:
-                                    _currencyRates[_selectedCurrency] ?? 1.0,
-                                currencySymbol:
-                                    _currencySymbols[_selectedCurrency] ??
-                                    'Rp ',
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _isCheckingProfile
+                            ? null
+                            : _checkProfileAndBooking,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           elevation: 0,
@@ -454,14 +608,23 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                             borderRadius: BorderRadius.circular(24),
                           ),
                         ),
-                        child: Text(
-                          'Pesan Tiket',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isCheckingProfile
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                'Pesan Tiket',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ],

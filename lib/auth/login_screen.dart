@@ -272,6 +272,9 @@ class _LoginScreenState extends State<LoginScreen> {
             }
           }
 
+          // Setelah await di atas, pastikan halaman masih aktif sebelum pakai context
+          if (!mounted) return;
+
           if (userRole == 'petugas' || userRole == 'admin') {
             Navigator.pushAndRemoveUntil(
               context,

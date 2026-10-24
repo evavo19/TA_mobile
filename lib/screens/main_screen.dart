@@ -7,14 +7,18 @@ import 'home_screen.dart';
 import 'profil_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  /// Tab yang aktif saat pertama dibuka:
+  /// 0 = Beranda, 1 = Tiket Saya, 2 = Asisten AI, 3 = Profil
+  final int initialIndex;
+
+  const MainScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _index = 0;
+  late int _index;
 
   late final List<Widget> _pages;
 
@@ -25,6 +29,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _index = widget.initialIndex;
     _pages = [
       // Tab 0: Beranda
       const HomeScreen(),
@@ -187,8 +192,9 @@ class _DockedNoSnackBarLocation extends FloatingActionButtonLocation {
   @override
   Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
     final x =
-        (geometry.scaffoldSize.width - geometry.floatingActionButtonSize.width) /
-            2;
+        (geometry.scaffoldSize.width -
+            geometry.floatingActionButtonSize.width) /
+        2;
     final y =
         geometry.contentBottom - geometry.floatingActionButtonSize.height / 2;
     return Offset(x, y);

@@ -68,6 +68,9 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           child: FloatingActionButton(
+            // DITAMBAH: matikan animasi Hero (tombol "terbang" saat kembali
+            // dari halaman lain)
+            heroTag: null,
             onPressed: () {
               Navigator.push(
                 context,
@@ -88,6 +91,9 @@ class _MainScreenState extends State<MainScreen> {
 
       // Lokasi custom: tetap menempel di lekukan walau ada SnackBar
       floatingActionButtonLocation: const _DockedNoSnackBarLocation(),
+
+      // DITAMBAH: matikan animasi perpindahan posisi FAB
+      floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
 
       // Bottom bar: bayangan + isi putih digambar di belakang,
       // garis border digambar di depan. Semua memakai satu path lekukan.

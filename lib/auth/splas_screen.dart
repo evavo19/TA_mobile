@@ -26,7 +26,7 @@ class SplashScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40.0),
               child: Image.asset(
-                'assets/LelunganJogja.jpg',
+                'assets/LogoLelungan2.png',
                 width: 260, // Ukuran logo proporsional
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => Container(

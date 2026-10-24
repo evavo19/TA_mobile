@@ -21,6 +21,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
   PesananModel? _directPesanan;
   List<PesananModel> _listPesanan = [];
   bool _isVerified = true;
+  bool _isVerifying = true; // true selama hash sedang dihitung ulang
   bool _isLoading = true;
   String _displayHash = '';
 
@@ -94,15 +95,28 @@ class _ETicketScreenState extends State<ETicketScreen> {
     });
   }
 
+  // Lama minimal status "Memverifikasi..." tampil, supaya terlihat jelas oleh user
+  static const Duration _jedaMinimalVerifikasi = Duration(milliseconds: 1500);
+
   Future<void> _verifyBlockchainData(String qrCode, String currentHash) async {
-    bool isAuthentic = await BlockchainService.verifikasiTiket(
-      qrCode,
-      currentHash,
-    );
+    final mulai = DateTime.now();
+
+    final hasil = currentHash.isEmpty
+        ? const HasilVerifikasi(false, 'Tiket belum memiliki hash.')
+        : await BlockchainService.verifikasiDetail(qrCode, currentHash);
+
+    debugPrint('Verifikasi blockchain: ${hasil.valid} - ${hasil.pesan}');
+
+    // Kalau verifikasi selesai lebih cepat dari jeda minimal, tunggu sisanya
+    final sisa = _jedaMinimalVerifikasi - DateTime.now().difference(mulai);
+    if (sisa > Duration.zero) {
+      await Future.delayed(sisa);
+    }
 
     if (mounted) {
       setState(() {
-        _isVerified = isAuthentic || currentHash.isNotEmpty;
+        _isVerified = hasil.valid; // hasil asli, tidak lagi selalu true
+        _isVerifying = false;
       });
     }
   }
@@ -236,9 +250,11 @@ class _ETicketScreenState extends State<ETicketScreen> {
                     Text(
                       isUsed
                           ? 'Sudah Digunakan (Hangus)'
-                          : (_isVerified
-                              ? 'Terverifikasi ✓'
-                              : 'Belum Terverifikasi'),
+                          : (_isVerifying
+                              ? 'Memverifikasi...'
+                              : (_isVerified
+                                  ? 'Terverifikasi ✓'
+                                  : 'Tiket Tidak Valid')),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

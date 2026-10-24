@@ -1,3 +1,4 @@
+import 'dart:async'; // Diperlukan untuk StreamSubscription
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -23,6 +24,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
   bool _isLoading = true;
   String _displayHash = '';
 
+  // Langganan stream untuk Supabase Realtime
+  StreamSubscription? _ticketSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -35,9 +39,59 @@ class _ETicketScreenState extends State<ETicketScreen> {
       _isLoading = false;
 
       _verifyBlockchainData(_directPesanan!.qrCode, h);
+
+      // Dengarkan perubahan real-time untuk detail tiket tunggal ini
+      _subscribeToSingleTicket(_directPesanan!.id);
     } else {
       _loadUserTickets();
+      // Dengarkan perubahan real-time untuk daftar tiket pengguna
+      _subscribeToUserTickets();
     }
+  }
+
+  @override
+  void dispose() {
+    // Batalkan stream listener saat layar ditutup agar tidak terjadi memory leak
+    _ticketSubscription?.cancel();
+    super.dispose();
+  }
+
+  // 1. Real-time Stream untuk Daftar Tiket (Daftar Banyak Tiket)
+  void _subscribeToUserTickets() {
+    final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) return;
+
+    _ticketSubscription = supabase
+        .from('blockchain_tiket')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', currentUser.id)
+        .order('id', ascending: false)
+        .listen((data) {
+      if (mounted) {
+        setState(() {
+          _listPesanan = data.map((map) => PesananModel.fromMap(map)).toList();
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  // 2. Real-time Stream untuk Detail Tiket Tunggal
+  void _subscribeToSingleTicket(dynamic ticketId) {
+    final supabase = Supabase.instance.client;
+
+    _ticketSubscription = supabase
+        .from('blockchain_tiket')
+        .stream(primaryKey: ['id'])
+        .eq('id', ticketId)
+        .listen((data) {
+      if (data.isNotEmpty && mounted) {
+        setState(() {
+          _directPesanan = PesananModel.fromMap(data.first);
+        });
+      }
+    });
   }
 
   Future<void> _verifyBlockchainData(String qrCode, String currentHash) async {
@@ -86,6 +140,14 @@ class _ETicketScreenState extends State<ETicketScreen> {
     }
   }
 
+  // Fungsi helper untuk mendeteksi mata uang secara dinamis berdasarkan nominal harga
+  String _dapatkanMataUang(PesananModel item) {
+    if (item.totalHarga < 1000) {
+      return 'JPY'; // Menyesuaikan jika nominal kecil (seperti JPY/USD/EUR)
+    }
+    return 'IDR';
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
@@ -115,14 +177,15 @@ class _ETicketScreenState extends State<ETicketScreen> {
       body: _isLoading && widget.pesanan == null
           ? const Center(child: CircularProgressIndicator())
           : widget.pesanan != null
-          ? _buildDirectTicketView(primaryColor)
-          : _buildTixIdListView(primaryColor),
+              ? _buildDirectTicketView(primaryColor)
+              : _buildTixIdListView(primaryColor),
     );
   }
 
   Widget _buildDirectTicketView(Color primaryColor) {
     final item = _directPesanan!;
     final bool isUsed = item.isUsed;
+    final String currency = _dapatkanMataUang(item);
 
     return Center(
       child: SingleChildScrollView(
@@ -149,8 +212,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
                   color: isUsed
                       ? const Color(0xFFFFEBEE)
                       : (_isVerified
-                            ? const Color(0xFFE8F5E9)
-                            : const Color(0xFFFFEBEE)),
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFEBEE)),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -160,30 +223,30 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       isUsed
                           ? Icons.block_rounded
                           : (_isVerified
-                                ? Icons.verified_user_rounded
-                                : Icons.gpp_maybe_rounded),
+                              ? Icons.verified_user_rounded
+                              : Icons.gpp_maybe_rounded),
                       size: 16,
                       color: isUsed
                           ? Colors.red.shade700
                           : (_isVerified
-                                ? const Color(0xFF2E7D32)
-                                : Colors.red),
+                              ? const Color(0xFF2E7D32)
+                              : Colors.red),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       isUsed
                           ? 'Sudah Digunakan (Hangus)'
                           : (_isVerified
-                                ? 'Terverifikasi ✓'
-                                : 'Belum Terverifikasi'),
+                              ? 'Terverifikasi ✓'
+                              : 'Belum Terverifikasi'),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isUsed
                             ? Colors.red.shade700
                             : (_isVerified
-                                  ? const Color(0xFF2E7D32)
-                                  : Colors.red),
+                                ? const Color(0xFF2E7D32)
+                                : Colors.red),
                       ),
                     ),
                   ],
@@ -214,23 +277,12 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 ),
                 child: Column(
                   children: [
-                    ColorFiltered(
-                      colorFilter: isUsed
-                          ? const ColorFilter.mode(
-                              Colors.grey,
-                              BlendMode.saturation,
-                            )
-                          : const ColorFilter.mode(
-                              Colors.transparent,
-                              BlendMode.multiply,
-                            ),
-                      child: QrImageView(
-                        data: item.qrCode.isNotEmpty
-                            ? item.qrCode
-                            : 'VALID_TICKET',
-                        version: QrVersions.auto,
-                        size: 160.0,
-                      ),
+                    QrImageView(
+                      data: item.qrCode.isNotEmpty
+                          ? item.qrCode
+                          : 'VALID_TICKET',
+                      version: QrVersions.auto,
+                      size: 160.0,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -278,7 +330,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Total: IDR ${item.totalHarga.toStringAsFixed(0)}',
+                'Total: $currency ${item.totalHarga.toStringAsFixed(0)}',
                 style: GoogleFonts.poppins(
                   color: primaryColor,
                   fontWeight: FontWeight.bold,
@@ -337,17 +389,20 @@ class _ETicketScreenState extends State<ETicketScreen> {
         itemBuilder: (context, index) {
           final item = _listPesanan[index];
           final bool isUsed = item.isUsed;
+          final String currency = _dapatkanMataUang(item);
 
           return InkWell(
-            // 🛑 Jika tiket sudah digunakan (isUsed == true), fungsi onTap bernilai null (tidak dapat diklik)
+            // 🛑 Mencegah klik apabila tiket sudah hangus
             onTap: isUsed
                 ? null
                 : () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            ETicketScreen(pesanan: item, hashTiket: item.hash),
+                        builder: (context) => ETicketScreen(
+                          pesanan: item,
+                          hashTiket: item.hash,
+                        ),
                       ),
                     );
                   },
@@ -355,7 +410,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: Colors.white, // Kartu tetap putih bersih
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -486,21 +541,10 @@ class _ETicketScreenState extends State<ETicketScreen> {
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        ColorFiltered(
-                          colorFilter: isUsed
-                              ? const ColorFilter.mode(
-                                  Colors.grey,
-                                  BlendMode.saturation,
-                                )
-                              : const ColorFilter.mode(
-                                  Colors.transparent,
-                                  BlendMode.multiply,
-                                ),
-                          child: QrImageView(
-                            data: item.qrCode,
-                            version: QrVersions.auto,
-                            size: 70.0,
-                          ),
+                        QrImageView(
+                          data: item.qrCode,
+                          version: QrVersions.auto,
+                          size: 70.0,
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -516,7 +560,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 ),
                               ),
                               Text(
-                                'Total: IDR ${item.totalHarga.toStringAsFixed(0)}',
+                                'Total: $currency ${item.totalHarga.toStringAsFixed(0)}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,

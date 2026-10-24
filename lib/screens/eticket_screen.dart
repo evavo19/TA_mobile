@@ -19,8 +19,7 @@ class ETicketScreen extends StatefulWidget {
 class _ETicketScreenState extends State<ETicketScreen> {
   PesananModel? _directPesanan;
   List<PesananModel> _listPesanan = [];
-  bool _isVerified =
-      true; // 👈 Langsung true agar badge langsung hijau sejak awal
+  bool _isVerified = true;
   bool _isLoading = true;
   String _displayHash = '';
 
@@ -31,15 +30,13 @@ class _ETicketScreenState extends State<ETicketScreen> {
       _directPesanan = widget.pesanan;
       String h = widget.hashTiket ?? widget.pesanan!.hash;
 
-      // 👈 Langsung set data tanpa menunggu loading/kedipan
       _displayHash = h;
       _isVerified = h.isNotEmpty;
       _isLoading = false;
 
-      // Verifikasi blockchain dijalankan senyap di background
       _verifyBlockchainData(_directPesanan!.qrCode, h);
     } else {
-      _loadUserTickets(); // Mengambil tiket khusus user yang sedang login
+      _loadUserTickets();
     }
   }
 
@@ -56,7 +53,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
     }
   }
 
-  // 🔄 Fungsi mengambil tiket HANYA untuk user yang sedang aktif login
   Future<void> _loadUserTickets() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -73,10 +69,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
       final response = await supabase
           .from('blockchain_tiket')
           .select()
-          .eq(
-            'user_id',
-            currentUser.id,
-          ) // 👈 Filter berdasarkan ID user yang login
+          .eq('user_id', currentUser.id)
           .order('id', ascending: false);
 
       if (mounted) {
@@ -343,10 +336,10 @@ class _ETicketScreenState extends State<ETicketScreen> {
         itemCount: _listPesanan.length,
         itemBuilder: (context, index) {
           final item = _listPesanan[index];
-          final bool isUsed = item.isUsed; // 👈 Status tiket dari database
+          final bool isUsed = item.isUsed;
 
           return InkWell(
-            // 🛑 Jika sudah digunakan, fungsi onTap dimatikan (tidak bisa diklik)
+            // 🛑 Jika tiket sudah digunakan (isUsed == true), fungsi onTap bernilai null (tidak dapat diklik)
             onTap: isUsed
                 ? null
                 : () {
@@ -362,8 +355,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color:
-                    Colors.white, // 👈 Latar belakang kartu tetap putih bersih
+                color: Colors.white, // Kartu tetap putih bersih
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -395,7 +387,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                     : const Color(0xFF2E7D32),
                               ),
                             ),
-                            // Badge elegan penanda status di sisi kanan atas card
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,

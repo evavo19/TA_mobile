@@ -75,7 +75,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
           final initialPayload = {
             'id': user.id,
             'email': user.email ?? '',
-            'full_name': user.userMetadata?['full_name'] ?? '',
+            'fullName': user.userMetadata?['fullName'] ?? '',
             'avatar_url': null,
           };
           await _supabase.from('profiles').upsert(initialPayload);
@@ -132,9 +132,9 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
       final Map<String, dynamic> payload = {
         'id': user.id,
         'email': user.email ?? '',
-        'full_name':
+        'fullName':
             _currentUserModel?.fullName ??
-            user.userMetadata?['full_name'] ??
+            user.userMetadata?['fullName'] ??
             'Pengguna',
         'avatar_url': publicUrl,
       };
@@ -1315,7 +1315,7 @@ class _PlaceholderProfilScreenState extends State<PlaceholderProfilScreen> {
                                 (_currentUserModel?.fullName != null &&
                                         _currentUserModel!.fullName.isNotEmpty)
                                     ? _currentUserModel!.fullName
-                                    : (user?.userMetadata?['full_name'] ??
+                                    : (user?.userMetadata?['fullName'] ??
                                           'Belum Diisi'),
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.poppins(

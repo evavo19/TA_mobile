@@ -24,10 +24,11 @@ class SplashScreen extends StatelessWidget {
           height: double.infinity,
           child: Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Image.asset(
                 'assets/LogoLelungan2.png',
-                width: 260, // Ukuran logo proporsional
+                // 90% lebar layar (ubah 0.9 jadi 0.8 untuk lebih kecil, 1.0 untuk penuh)
+                width: MediaQuery.of(context).size.width * 1.0,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => Container(
                   height: 180,

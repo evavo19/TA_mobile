@@ -100,9 +100,6 @@ class BlockchainService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // VERIFIKASI BLOCKCHAIN
-  // ---------------------------------------------------------------------------
 
   /// Kandidat format `created_at`. Kalau kolom di database bertipe timestamptz,
   /// Supabase mengembalikan format berbeda dari string aslinya, jadi kita coba

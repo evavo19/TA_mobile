@@ -3,14 +3,14 @@ import 'package:crypto/crypto.dart';
 
 class BlockchainModel {
   final int? id;
-  final String? userId; // 👈 Tambahan user_id
-  final String ticketId; // ID Unik / Kode QR Tiket
+  final String? userId;
+  final String ticketId; 
   final String namaWisata;
   final String tanggalKunjungan;
   final int jumlahTiket;
   final double totalHarga;
-  final String previousHash; // Hash dari blok sebelumnya
-  final String hash; // Hash dari blok ini
+  final String previousHash; 
+  final String hash; 
   final String createdAt;
 
   BlockchainModel({
@@ -44,7 +44,7 @@ class BlockchainModel {
   factory BlockchainModel.fromMap(Map<String, dynamic> map) {
     return BlockchainModel(
       id: map['id'],
-      userId: map['user_id'], // 👈 Mapping dari Supabase
+      userId: map['user_id'],
       ticketId: map['ticket_id'] ?? '',
       namaWisata: map['nama_wisata'] ?? '',
       tanggalKunjungan: map['tanggal_kunjungan'] ?? '',
@@ -58,7 +58,7 @@ class BlockchainModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'user_id': userId, // 👈 Disimpan ke Supabase
+      'user_id': userId, 
       'ticket_id': ticketId,
       'nama_wisata': namaWisata,
       'tanggal_kunjungan': tanggalKunjungan,

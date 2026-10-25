@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:sensors_plus/sensors_plus.dart'; // 👈 Import package sensor
+import 'package:sensors_plus/sensors_plus.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -19,7 +19,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _timeLeft = 15;
   Timer? _gameTimer;
   Timer? _spawnTimer;
-  StreamSubscription? _accelerometerSubscription; // 👈 Untuk listener sensor
+  StreamSubscription? _accelerometerSubscription;
 
   // Target skor untuk menang
   static const int _targetScore = 60;
@@ -34,7 +34,7 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
-    _initSensor(); // 👈 Mulai mendengarkan sensor saat halaman dibuka
+    _initSensor(); 
   }
 
   // Fungsi untuk membaca sensor akselerometer (kemiringan HP)
@@ -300,7 +300,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void dispose() {
     _gameTimer?.cancel();
     _spawnTimer?.cancel();
-    _accelerometerSubscription?.cancel(); // 👈 Matikan sensor saat keluar halaman agar tidak boros baterai
+    _accelerometerSubscription?.cancel();
     super.dispose();
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -84,12 +85,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
       setState(() {
         if (_random.nextDouble() < 0.25) {
-          _items.add(_FallingItem(
-            x: _random.nextDouble(),
-            y: 0,
-            type: _getRandomItemType(),
-            speed: 0.035 + (_random.nextDouble() * 0.025),
-          ));
+          _items.add(
+            _FallingItem(
+              x: _random.nextDouble(),
+              y: 0,
+              type: _getRandomItemType(),
+              speed: 0.035 + (_random.nextDouble() * 0.025),
+            ),
+          );
         }
 
         for (int i = _items.length - 1; i >= 0; i--) {
@@ -195,7 +198,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     : 'Wah, skor kamu belum cukup atau kena jebakan Zonk/Bom! Targetnya $_targetScore poin.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
-                    fontSize: 12, color: Colors.grey.shade600),
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
               ),
               const SizedBox(height: 16),
               Container(
@@ -210,15 +215,18 @@ class _QuizScreenState extends State<QuizScreen> {
                     Text(
                       'Total Skor Akhir',
                       style: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.grey),
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
                     ),
                     Text(
                       '$_score Poin',
                       style: GoogleFonts.poppins(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color:
-                            isWin ? const Color(0xFF1550B6) : Colors.redAccent,
+                        color: isWin
+                            ? const Color(0xFF1550B6)
+                            : Colors.redAccent,
                       ),
                     ),
                   ],
@@ -238,8 +246,11 @@ class _QuizScreenState extends State<QuizScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.monetization_on,
-                        color: Colors.amber, size: 26),
+                    const Icon(
+                      Icons.monetization_on,
+                      color: Colors.amber,
+                      size: 26,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '+$_koinDidapat Koin',
@@ -253,13 +264,17 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.amber.shade50,
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.amber.shade400, width: 1.5),
+                    border: Border.all(
+                      color: Colors.amber.shade400,
+                      width: 1.5,
+                    ),
                   ),
                   child: Text(
                     'Total koin kamu: $_totalKoin',
@@ -275,9 +290,11 @@ class _QuizScreenState extends State<QuizScreen> {
                   'Skor kamu 0, jadi belum ada koin yang didapat. Hati-hati dengan Bom dan Zonk!',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
-                      fontSize: 11, color: Colors.grey.shade700),
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-              ]
+              ],
             ],
           ),
           actions: [
@@ -300,8 +317,9 @@ class _QuizScreenState extends State<QuizScreen> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isWin ? const Color(0xFF1550B6) : Colors.grey.shade700,
+                backgroundColor: isWin
+                    ? const Color(0xFF1550B6)
+                    : Colors.grey.shade700,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -356,8 +374,11 @@ class _QuizScreenState extends State<QuizScreen> {
             padding: const EdgeInsets.only(right: 14),
             child: Row(
               children: [
-                const Icon(Icons.monetization_on,
-                    color: Colors.amber, size: 22),
+                const Icon(
+                  Icons.monetization_on,
+                  color: Colors.amber,
+                  size: 22,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '$_totalKoin',
@@ -398,8 +419,11 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   Row(
                     children: [
-                      const Icon(Icons.timer_outlined,
-                          color: Colors.redAccent, size: 28),
+                      const Icon(
+                        Icons.timer_outlined,
+                        color: Colors.redAccent,
+                        size: 28,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         '$_timeLeft dtk',
@@ -452,7 +476,9 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 32, vertical: 8),
+                                    horizontal: 32,
+                                    vertical: 8,
+                                  ),
                                   child: Text(
                                     'Pegang HP dan miringkan ke kiri/kanan untuk menggerakkan keranjang. Kumpulkan skor setinggi mungkin untuk mendapatkan koin!',
                                     textAlign: TextAlign.center,
@@ -471,8 +497,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(25),
+                                        borderRadius: BorderRadius.circular(25),
                                       ),
                                     ),
                                     child: Text(
@@ -520,7 +545,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     color: Colors.black26,
                                     blurRadius: 8,
                                     offset: Offset(0, 4),
-                                  )
+                                  ),
                                 ],
                               ),
                               child: const Center(
@@ -553,11 +578,7 @@ class _QuizScreenState extends State<QuizScreen> {
           size: 34,
         );
       case _ItemType.coin:
-        return const Icon(
-          Icons.monetization_on,
-          color: Colors.amber,
-          size: 34,
-        );
+        return const Icon(Icons.monetization_on, color: Colors.amber, size: 34);
       case _ItemType.bomb:
         return const Icon(
           Icons.local_fire_department,
@@ -565,11 +586,7 @@ class _QuizScreenState extends State<QuizScreen> {
           size: 36,
         );
       case _ItemType.zonk:
-        return const Icon(
-          Icons.cancel,
-          color: Colors.red,
-          size: 36,
-        );
+        return const Icon(Icons.cancel, color: Colors.red, size: 36);
     }
   }
 }

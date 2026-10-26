@@ -23,8 +23,14 @@ class LbsScreen extends StatefulWidget {
 class _LbsScreenState extends State<LbsScreen> {
   final MapController _mapController = MapController();
 
+  // Default: UPN "Veteran" Yogyakarta Kampus 2 Babarsari.
+  // Koordinat ini perkiraan, cek ulang lewat Google Maps (tekan lama di titik kampus).
+  static const LatLng _defaultLocation = LatLng(-7.7790, 110.4140);
+  static const String _defaultLocationName =
+      'UPN Kampus 2 Babarsari (Lokasi Default)';
+
   // GPS Device Location
-  LatLng _userLocation = const LatLng(-7.7926, 110.3658); // Default Malioboro
+  LatLng _userLocation = _defaultLocation;
   String _currentLocationName = 'Mendapatkan lokasi GPS...';
   bool _isLoading = true;
 
@@ -58,6 +64,106 @@ class _LbsScreenState extends State<LbsScreen> {
         c((lat2 - lat1) * p) / 2 +
         c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
+  }
+
+  // Konversi WGS84 latitude/longitude -> UTM.
+  // Contoh hasil: "49M 4xxxxx mE 9xxxxxx mN"
+  String _toUtm(double lat, double lon) {
+    const a = 6378137.0;
+    const f = 1 / 298.257223563;
+    const k0 = 0.9996;
+    const e2 = f * (2 - f);
+    const ep2 = e2 / (1 - e2);
+
+    final zone = ((lon + 180) / 6).floor() + 1;
+    final lon0 = ((zone - 1) * 6 - 180 + 3) * pi / 180;
+    final phi = lat * pi / 180;
+    final lam = lon * pi / 180;
+
+    final sinP = sin(phi);
+    final cosP = cos(phi);
+    final tanP = tan(phi);
+
+    final n = a / sqrt(1 - e2 * sinP * sinP);
+    final t = tanP * tanP;
+    final c = ep2 * cosP * cosP;
+    final aa = cosP * (lam - lon0);
+
+    final m = a *
+        ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * phi -
+            (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) *
+                sin(2 * phi) +
+            (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * sin(4 * phi) -
+            (35 * e2 * e2 * e2 / 3072) * sin(6 * phi));
+
+    final easting = k0 *
+            n *
+            (aa +
+                (1 - t + c) * pow(aa, 3) / 6 +
+                (5 - 18 * t + t * t + 72 * c - 58 * ep2) * pow(aa, 5) / 120) +
+        500000.0;
+
+    var northing = k0 *
+        (m +
+            n *
+                tanP *
+                (aa * aa / 2 +
+                    (5 - t + 9 * c + 4 * c * c) * pow(aa, 4) / 24 +
+                    (61 - 58 * t + t * t + 600 * c - 330 * ep2) *
+                        pow(aa, 6) /
+                        720));
+    if (lat < 0) northing += 10000000.0;
+
+    const letters = 'CDEFGHJKLMNPQRSTUVWX';
+    final band = letters[((lat + 80) / 8).floor().clamp(0, 19)];
+
+    return '$zone$band ${easting.toStringAsFixed(0)} mE '
+        '${northing.toStringAsFixed(0)} mN';
+  }
+
+  // Minta Cloudinary kirim thumbnail JPEG standar 200x200.
+  // Menyelesaikan gambar yang gagal di-decode dan memperkecil ukuran unduhan.
+  String _thumb(String url) {
+    if (url.contains('res.cloudinary.com') && url.contains('/upload/')) {
+      return url.replaceFirst(
+        '/upload/',
+        '/upload/w_200,h_200,c_fill,f_jpg,q_auto/',
+      );
+    }
+    return url;
+  }
+
+  // Satu baris koordinat: label di kiri (lebar tetap), nilai di kanan.
+  Widget _coordRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 78,
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Buka Google Maps aplikasi eksternal
@@ -100,13 +206,16 @@ class _LbsScreenState extends State<LbsScreen> {
           _userLocation = LatLng(position.latitude, position.longitude);
           _currentLocationName = 'Lokasi GPS Presisi Anda';
         } else {
-          _currentLocationName = 'Malioboro (Lokasi Default)';
+          _userLocation = _defaultLocation;
+          _currentLocationName = _defaultLocationName;
         }
       } else {
-        _currentLocationName = 'Malioboro (Lokasi Default)';
+        _userLocation = _defaultLocation;
+        _currentLocationName = _defaultLocationName;
       }
     } catch (_) {
-      _currentLocationName = 'Malioboro (Lokasi Default)';
+      _userLocation = _defaultLocation;
+      _currentLocationName = _defaultLocationName;
     }
 
     // 2. Ambil data wisata
@@ -213,6 +322,9 @@ class _LbsScreenState extends State<LbsScreen> {
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
     final wisataTampil = _filteredWisata;
+
+    // Titik yang ditampilkan koordinatnya: destinasi terpilih, atau posisi user
+    final infoPoint = _selectedDestination ?? _userLocation;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
@@ -328,46 +440,77 @@ class _LbsScreenState extends State<LbsScreen> {
                   ),
                 ),
 
-                // Info bar lokasi GPS
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Row(
+                // Info bar lokasi GPS + koordinat (Lat/Long dan UTM)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: primaryColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _selectedDestinationName != null
-                              ? 'Rute ke: $_selectedDestinationName'
-                              : _currentLocationName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            color: primaryColor,
+                            size: 20,
                           ),
-                        ),
-                      ),
-                      if (_selectedDestination != null)
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedDestination = null;
-                              _selectedDestinationName = null;
-                            });
-                          },
-                          child: Text(
-                            'Hapus Rute',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.red,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _selectedDestinationName != null
+                                  ? 'Rute ke: $_selectedDestinationName'
+                                  : _currentLocationName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
+                          if (_selectedDestination != null)
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedDestination = null;
+                                  _selectedDestinationName = null;
+                                });
+                              },
+                              child: Text(
+                                'Hapus Rute',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Divider(height: 1, color: Colors.grey.shade200),
+                      _coordRow(
+                        'Lat/Long',
+                        '${infoPoint.latitude.toStringAsFixed(5)}, '
+                            '${infoPoint.longitude.toStringAsFixed(5)}',
+                      ),
+                      _coordRow(
+                        'UTM',
+                        _toUtm(infoPoint.latitude, infoPoint.longitude),
+                      ),
                     ],
                   ),
                 ),
@@ -447,26 +590,44 @@ class _LbsScreenState extends State<LbsScreen> {
                                 contentPadding: const EdgeInsets.all(8),
                                 leading: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  // DIUBAH: CachedNetworkImage, tetap tampil saat offline
-                                  child: CachedNetworkImage(
-                                    imageUrl: item['foto_url'],
-                                    width: 70,
-                                    height: 70,
-                                    fit: BoxFit.cover,
-                                    memCacheWidth: 200,
-                                    placeholder: (context, url) => Container(
-                                      width: 70,
-                                      height: 70,
-                                      color: Colors.grey.shade200,
-                                    ),
-                                    errorWidget: (context, url, error) =>
-                                        Container(
-                                      width: 70,
-                                      height: 70,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(Icons.landscape),
-                                    ),
-                                  ),
+                                  // CachedNetworkImage, tetap tampil saat offline.
+                                  // URL kosong langsung pakai ikon (tanpa error),
+                                  // error load dicatat di Debug Console.
+                                  child: (item['foto_url'] as String)
+                                          .trim()
+                                          .isEmpty
+                                      ? Container(
+                                          width: 70,
+                                          height: 70,
+                                          color: Colors.grey.shade300,
+                                          child: const Icon(Icons.landscape),
+                                        )
+                                      : CachedNetworkImage(
+                                          imageUrl: _thumb(item['foto_url']),
+                                          width: 70,
+                                          height: 70,
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: 200,
+                                          placeholder: (context, url) =>
+                                              Container(
+                                            width: 70,
+                                            height: 70,
+                                            color: Colors.grey.shade200,
+                                          ),
+                                          errorWidget: (context, url, error) {
+                                            debugPrint(
+                                              'Gagal load gambar: "$url" -> $error',
+                                            );
+                                            return Container(
+                                              width: 70,
+                                              height: 70,
+                                              color: Colors.grey.shade300,
+                                              child: const Icon(
+                                                Icons.landscape,
+                                              ),
+                                            );
+                                          },
+                                        ),
                                 ),
                                 title: Text(
                                   item['nama'],

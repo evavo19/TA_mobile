@@ -317,7 +317,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
               const SizedBox(height: 16),
               if (_displayHash.isNotEmpty || item.hash.isNotEmpty) ...[
                 Text(
-                  'Hash Tiket (Blockchain):',
+                  'Hash Tiket:',
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     color: Colors.grey.shade600,

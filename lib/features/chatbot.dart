@@ -1,4 +1,3 @@
-
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,9 +11,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // Import model dan screen detail wisata
 import '../models/wisata_model.dart';
 import '../screens/detail_wisata_screen.dart';
+// TAMBAHAN: data wisata lengkap (Supabase -> SQLite) untuk rekomendasi terdekat & favorit
+import '../services/wisata_service.dart' as wisata_svc;
+
+// TAMBAHAN: "kotak surat" untuk mengirim pesan ke chatbot dari luar (dipakai banner Home
+// lewat MainScreen saat chatbot berjalan sebagai tab). Nilai akan dikosongkan setelah dibaca.
+final ValueNotifier<String?> chatbotPesanMasuk = ValueNotifier<String?>(null);
 
 class ChatbotScreen extends StatefulWidget {
-  const ChatbotScreen({super.key});
+  // TAMBAHAN: pesan yang dikirim otomatis saat halaman dibuka (dipakai banner Home).
+  // Kalau null, halaman berjalan seperti biasa.
+  final String? pesanAwal;
+
+  const ChatbotScreen({super.key, this.pesanAwal});
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -53,11 +62,35 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   void initState() {
     super.initState();
     _initGemini();
-    _initUserGps();
+    final gps = _initUserGps();
+
+    // TAMBAHAN: kalau dibuka dari banner Home, kirim pesan awal otomatis
+    // setelah GPS selesai (maks 8 detik) supaya jarak dihitung dari lokasi asli.
+    if (widget.pesanAwal != null) {
+      gps
+          .timeout(const Duration(seconds: 8), onTimeout: () {})
+          .whenComplete(() {
+        if (mounted) _sendMessage(widget.pesanAwal!);
+      });
+    }
+
+    // TAMBAHAN: saat chatbot berjalan sebagai tab, dengarkan pesan dari banner Home
+    if (widget.pesanAwal == null) {
+      chatbotPesanMasuk.addListener(_onPesanMasuk);
+    }
+  }
+
+  // TAMBAHAN: ambil pesan dari "kotak surat", kosongkan, lalu kirim otomatis
+  void _onPesanMasuk() {
+    final pesan = chatbotPesanMasuk.value;
+    if (pesan == null) return;
+    chatbotPesanMasuk.value = null;
+    _sendMessage(pesan);
   }
 
   @override
   void dispose() {
+    chatbotPesanMasuk.removeListener(_onPesanMasuk); // TAMBAHAN
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -116,6 +149,52 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         c((lat2 - lat1) * p) / 2 +
         c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
+  }
+
+  // ===========================================================================
+  // TAMBAHAN: REKOMENDASI TERDEKAT & FAVORIT DARI SELURUH DATA WISATA
+  // ===========================================================================
+
+  // Skor favorit = rating x log(jumlah ulasan + 1)
+  // Wisata yang ratingnya bagus DAN banyak diulas naik ke atas.
+  double _skorFavorit(Map<String, dynamic> w) {
+    final rating = (w['rating'] as num?)?.toDouble() ?? 0;
+    final ulasan = (w['jumlah_ulasan'] as num?)?.toDouble() ?? 0;
+    return rating * log(ulasan + 1);
+  }
+
+  // Ambil semua data wisata (online -> Supabase, offline -> SQLite),
+  // hitung jarak dari posisi user, lalu urutkan jadi 2 daftar.
+  // Bentuk tiap item dibuat sama dengan kartu chatbot (jarak, harga, foto_url).
+  Future<Map<String, List<Map<String, dynamic>>>> _rekomendasiLokal() async {
+    final data = await wisata_svc.WisataService().getWisataList();
+
+    final semua = data.map((w) {
+      final lat = (w['latitude'] as num?)?.toDouble();
+      final lng = (w['longitude'] as num?)?.toDouble();
+      final jarak = (lat == null || lng == null)
+          ? 9999.0
+          : _calculateDistance(_userLat, _userLng, lat, lng);
+
+      final item = Map<String, dynamic>.from(w);
+      item['jarak'] = jarak >= 9999 ? '-' : '${jarak.toStringAsFixed(1)} km';
+      item['jarak_num'] = jarak;
+      item['harga'] = 'Rp ${w['harga_weekday'] ?? 0}';
+      item['foto_url'] = w['foto_uri'] ?? w['foto_url'] ?? '';
+      return item;
+    }).toList();
+
+    final terdekat = semua
+        .where((w) => (w['jarak_num'] as double) < 9999)
+        .toList()
+      ..sort(
+        (a, b) => (a['jarak_num'] as double).compareTo(b['jarak_num'] as double),
+      );
+
+    final favorit = List<Map<String, dynamic>>.from(semua)
+      ..sort((a, b) => _skorFavorit(b).compareTo(_skorFavorit(a)));
+
+    return {'terdekat': terdekat, 'favorit': favorit};
   }
 
   // Fungsi Pilih Gambar dari Galeri atau Kamera
@@ -192,6 +271,54 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         debugPrint("Error fetching Supabase: $dbError");
       }
 
+      // TAMBAHAN: kalau user minta "terdekat" / "favorit" (tanpa foto), hitung dari
+      // SELURUH data wisata (bukan hanya 50 pertama), lalu jadikan konteks untuk
+      // Gemini dan tampilkan sebagai kartu.
+      String konteksTambahan = '';
+      List<Map<String, dynamic>>? kartuLokal;
+
+      final teksKecil = userText.toLowerCase();
+      final mintaFavorit =
+          teksKecil.contains('favorit') || teksKecil.contains('populer');
+      final mintaDekat = teksKecil.contains('dekat');
+
+      if (currentImageBytes == null && (mintaFavorit || mintaDekat)) {
+        final rek = await _rekomendasiLokal();
+        final jumlah = (mintaFavorit && mintaDekat) ? 3 : 5;
+        final terdekat = rek['terdekat']!.take(jumlah).toList();
+        final favorit = rek['favorit']!.take(jumlah).toList();
+
+        final buf = StringBuffer(
+          '\n\nDATA REKOMENDASI HASIL PERHITUNGAN (gunakan ini untuk menjawab):\n',
+        );
+        if (mintaDekat) {
+          buf.writeln('WISATA TERDEKAT (urut dari yang paling dekat):');
+          for (final w in terdekat) {
+            buf.writeln(
+              '- ${w['nama']} | Jarak: ${w['jarak']} | Rating: ${w['rating']} | Tiket: ${w['harga']}',
+            );
+          }
+        }
+        if (mintaFavorit) {
+          buf.writeln('WISATA FAVORIT (rating tinggi dan banyak ulasan):');
+          for (final w in favorit) {
+            buf.writeln(
+              '- ${w['nama']} | Rating: ${w['rating']} | Ulasan: ${w['jumlah_ulasan']} | Tiket: ${w['harga']}',
+            );
+          }
+        }
+        buf.writeln(
+          'Sebutkan nama tempat dengan jelas sesuai urutan daftar, singkat dan ramah.',
+        );
+        konteksTambahan = buf.toString();
+
+        final ids = <dynamic>{};
+        kartuLokal = [
+          if (mintaDekat) ...terdekat,
+          if (mintaFavorit) ...favorit,
+        ].where((w) => ids.add(w['id'])).toList();
+      }
+
       // 2. Siapkan Part Content untuk Gemini AI
       List<Part> contentParts = [];
 
@@ -214,6 +341,8 @@ Instruksi untuk AI:
 - Jawablah dengan ramah dan natural.
 ''';
 
+      prompt += konteksTambahan; // TAMBAHAN: data terdekat / favorit (kalau diminta)
+
       contentParts.add(TextPart(prompt));
 
       // 3. Kirim request multimodal ke Gemini Model secara langsung
@@ -235,6 +364,12 @@ Instruksi untuk AI:
             matchedCards.add(item);
           }
         }
+      }
+
+      // TAMBAHAN: untuk permintaan terdekat / favorit, kartu diambil dari hasil
+      // perhitungan seluruh data (bukan dari pencocokan nama).
+      if (kartuLokal != null && kartuLokal.isNotEmpty) {
+        matchedCards = kartuLokal;
       }
 
       // Jika user bertanya soal terdekat via teks/quick chip tanpa foto
@@ -325,6 +460,13 @@ Instruksi untuk AI:
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        // TAMBAHAN: tombol kembali hanya muncul kalau dibuka dari banner Home
+        leading: widget.pesanAwal != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
         centerTitle: true,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,

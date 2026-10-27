@@ -54,7 +54,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/main': (context) => const MainScreen(),
-        '/scan': (context) => const ScanTicketScreen(), // 👈 Daftarkan rute scan
+        '/scan': (context) => const ScanTicketScreen(), 
       },
     );
   }

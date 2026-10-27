@@ -7,6 +7,8 @@ import '../models/wisata_model.dart';
 import 'detail_wisata_screen.dart';
 import 'notifikasi_screen.dart';
 import 'wisata_gratis_screen.dart';
+import '../features/chatbot.dart'; // TAMBAHAN: ChatbotScreen (Asisten AI)
+import 'main_screen.dart'; // TAMBAHAN: untuk pindah tab ke Asisten AI
 import '../features/game.dart'; // QuizScreen
 import '../features/feedback.dart'; // FeedbackScreen
 import '../services/gps_service.dart'; // LbsScreen (sesuaikan path-nya)
@@ -84,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildQuickMenu(context),
                   const SizedBox(height: 20),
-                  _buildBanner(),
+                  _buildBanner(context),
                   const SizedBox(height: 24),
                   _sectionTitle('Kategori Wisata'),
                   const SizedBox(height: 12),
@@ -324,58 +326,89 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Banner
+  // Banner AI Rekomendasi (ketuk -> buka chatbot, otomatis tanya terdekat & favorit)
   // ---------------------------------------------------------------------------
-  Widget _buildBanner() {
+  Widget _buildBanner(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 120,
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1550B6), Color(0xFF3B82F6)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Spesial Jogja',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Temukan destinasi favoritmu dan nikmati suasana Jogja!',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          const pesan =
+              'Rekomendasikan wisata terdekat dari lokasiku dan wisata favorit pengunjung.';
+          // Pindah ke tab Asisten AI (menu bawah tetap ada) dan kirim pesan otomatis.
+          // Kalau Home dibuka di luar MainScreen, buka layar chatbot biasa.
+          if (!MainScreen.bukaAsistenAI(context, pesan)) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ChatbotScreen(pesanAwal: pesan),
               ),
+            );
+          }
+        },
+        child: Container(
+          height: 120,
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1550B6), Color(0xFF3B82F6)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-            const SizedBox(width: 12),
-            const Icon(
-              Icons.temple_buddhist_rounded,
-              color: Colors.white54,
-              size: 56,
-            ),
-          ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.amber,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'AI Rekomendasi Wisata',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Wisata terdekat dari lokasimu dan favorit pengunjung',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white70,
+                size: 36,
+              ),
+            ],
+          ),
         ),
       ),
     );

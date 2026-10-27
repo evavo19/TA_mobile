@@ -13,6 +13,17 @@ class MainScreen extends StatefulWidget {
 
   const MainScreen({super.key, this.initialIndex = 0});
 
+  /// TAMBAHAN: dipanggil dari Home (banner AI Rekomendasi).
+  /// Pindah ke tab Asisten AI (menu bawah tetap ada) lalu mengirim [pesan]
+  /// ke chatbot secara otomatis. Mengembalikan false kalau tidak ada MainScreen
+  /// di atas [context] (misal Home dibuka sendirian).
+  static bool bukaAsistenAI(BuildContext context, String pesan) {
+    final state = context.findAncestorStateOfType<_MainScreenState>();
+    if (state == null) return false;
+    state._pindahKeAsistenAI(pesan);
+    return true;
+  }
+
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
@@ -40,6 +51,13 @@ class _MainScreenState extends State<MainScreen> {
       // Tab 3: Profil
       const PlaceholderProfilScreen(),
     ];
+  }
+
+  // TAMBAHAN: pindah ke tab Asisten AI, lalu titip pesan ke chatbot
+  // lewat chatbotPesanMasuk (dibaca & dikirim otomatis oleh ChatbotScreen).
+  void _pindahKeAsistenAI(String pesan) {
+    setState(() => _index = 2);
+    chatbotPesanMasuk.value = pesan;
   }
 
   @override

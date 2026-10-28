@@ -9,6 +9,7 @@ import 'auth/splas_screen.dart';
 import 'services/database_helper.dart'; 
 import 'screens/main_screen.dart';
 import 'screens/scan_ticket_screen.dart'; 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");

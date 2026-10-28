@@ -1,4 +1,4 @@
-name: pemesanan_tiket
+name: "LelunganJogja"
 description: "Aplikasi Pemesanan Tiket Wisata Jogja bernama 'Lelungan Jogja'"
 publish_to: "none"
 
@@ -47,6 +47,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -54,3 +55,9 @@ flutter:
   assets:
     - .env
     - assets/LogoLelungan2.png
+
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/LogoLelungan2.png"
+  min_sdk_android: 21

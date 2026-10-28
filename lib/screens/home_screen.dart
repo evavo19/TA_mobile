@@ -7,12 +7,12 @@ import '../models/wisata_model.dart';
 import 'detail_wisata_screen.dart';
 import 'notifikasi_screen.dart';
 import 'wisata_gratis_screen.dart';
-import '../features/chatbot.dart'; // TAMBAHAN: ChatbotScreen (Asisten AI)
-import 'main_screen.dart'; // TAMBAHAN: untuk pindah tab ke Asisten AI
-import '../features/game.dart'; // QuizScreen
-import '../features/feedback.dart'; // FeedbackScreen
-import '../services/gps_service.dart'; // LbsScreen (sesuaikan path-nya)
-import '../services/wisata_service.dart' as wisata_svc; // Supabase + SQLite
+import '../features/chatbot.dart'; 
+import 'main_screen.dart'; 
+import '../features/game.dart'; 
+import '../features/feedback.dart'; 
+import '../services/gps_service.dart'; 
+import '../services/wisata_service.dart' as wisata_svc; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,8 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
     'Kuliner',
   ];
 
-  /// Nama user yang sedang login.
-  /// Urutan: metadata (nama / full_name / name) -> bagian depan email -> 'Wisatawan'
   String get _userName {
     final user = supabase.auth.currentUser;
     final meta = user?.userMetadata;
@@ -60,8 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _wisataFuture = _fetchWisata();
   }
 
-  /// Online  -> ambil dari Supabase, lalu disimpan ke SQLite (cache).
-  /// Offline -> ambil dari SQLite lokal.
   Future<List<WisataModel>> _fetchWisata() async {
     final data = await wisata_svc.WisataService().getWisataList();
     return data.map((e) => WisataModel.fromMap(e)).toList();
@@ -71,13 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      // DIUBAH: satu CustomScrollView (bukan NestedScrollView + SingleChildScrollView)
-      // supaya daftar wisata dibangun lazy (hanya yang terlihat di layar).
       body: CustomScrollView(
         slivers: [
           _buildAppBar(context),
 
-          // ===== Bagian atas (menu cepat, banner, kategori) =====
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(top: 20),
@@ -99,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ===== Daftar wisata (lazy) =====
           FutureBuilder<List<WisataModel>>(
             future: _wisataFuture,
             builder: (context, snapshot) {
@@ -175,9 +167,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // AppBar + sapaan + search
-  // ---------------------------------------------------------------------------
   SliverAppBar _buildAppBar(BuildContext context) {
     return SliverAppBar(
       pinned: true,
@@ -216,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sapaan
+          
               Text.rich(
                 TextSpan(
                   children: [
@@ -235,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: GoogleFonts.poppins(color: Colors.white, fontSize: 18),
               ),
               const SizedBox(height: 12),
-              // Search bar
+             
               TextField(
                 onChanged: (value) {
                   setState(() => _searchQuery = value.toLowerCase());
@@ -261,9 +250,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Tombol menu cepat
-  // ---------------------------------------------------------------------------
   Widget _buildQuickMenu(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -325,9 +311,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Banner AI Rekomendasi (ketuk -> buka chatbot, otomatis tanya terdekat & favorit)
-  // ---------------------------------------------------------------------------
   Widget _buildBanner(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -336,8 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () {
           const pesan =
               'Rekomendasikan wisata terdekat dari lokasiku dan wisata favorit pengunjung.';
-          // Pindah ke tab Asisten AI (menu bawah tetap ada) dan kirim pesan otomatis.
-          // Kalau Home dibuka di luar MainScreen, buka layar chatbot biasa.
+
           if (!MainScreen.bukaAsistenAI(context, pesan)) {
             Navigator.push(
               context,
@@ -414,9 +396,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Judul section + chip kategori
-  // ---------------------------------------------------------------------------
   Widget _sectionTitle(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -472,9 +451,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// =============================================================================
-// Kartu wisata (dipisah jadi widget sendiri)
-// =============================================================================
 class _WisataCard extends StatelessWidget {
   final WisataModel wisata;
 
@@ -514,13 +490,13 @@ class _WisataCard extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
-              // Foto di-cache di HP, tetap muncul saat offline
+          
               child: CachedNetworkImage(
                 imageUrl: wisata.gambarUrl,
                 height: 170,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                memCacheWidth: 600, // batasi resolusi di memori
+                memCacheWidth: 600, 
                 fadeInDuration: const Duration(milliseconds: 150),
                 placeholder: (context, url) => Container(
                   height: 170,
@@ -631,9 +607,6 @@ class _WisataCard extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Satu tombol menu cepat (ikon bulat + label)
-// =============================================================================
 class _QuickMenuItem extends StatelessWidget {
   final IconData icon;
   final String label;

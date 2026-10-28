@@ -16,14 +16,12 @@ class NotificationService {
     importance: Importance.high,
   );
 
-  /// Panggil sekali di main() sebelum runApp.
   static Future<void> init() async {
     if (_initialized) return;
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     await _plugin.initialize(const InitializationSettings(android: androidSettings));
 
-    // Daftarkan channel agar muncul di setelan notifikasi Android
     await _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -32,7 +30,6 @@ class NotificationService {
     _initialized = true;
   }
 
-  /// Menampilkan notifikasi sistem (status bar & laci notifikasi).
   static Future<void> show({
     required String title,
     required String body,

@@ -1,16 +1,16 @@
 class PesananModel {
   final dynamic id;
-  final String? userId; // 👈 Tambahan user_id
+  final String? userId; 
   final String qrCode;
   final String namaWisata;
   final String tanggalKunjungan;
   final int jumlahTiket;
   final double totalHarga;
-  final String mataUang; // 👈 Mata uang yang dipilih user (IDR, USD, EUR, JPY)
+  final String mataUang; 
   final String previousHash;
   final String hash;
   final String createdAt;
-  final bool isUsed; // 👈 Tambahan status penggunaan tiket (menyesuaikan kolom 'status' di database)
+  final bool isUsed; 
 
   PesananModel({
     this.id,
@@ -20,11 +20,11 @@ class PesananModel {
     required this.tanggalKunjungan,
     required this.jumlahTiket,
     required this.totalHarga,
-    this.mataUang = 'IDR', // 👈 Default IDR untuk tiket lama
+    this.mataUang = 'IDR', 
     this.previousHash = '',
     this.hash = '',
     required this.createdAt,
-    this.isUsed = false, // 👈 Default false (belum digunakan)
+    this.isUsed = false, 
   });
 
   factory PesananModel.fromMap(Map<String, dynamic> map) {
@@ -32,7 +32,7 @@ class PesananModel {
 
     return PesananModel(
       id: map['id'],
-      userId: map['user_id'], // 👈 Mapping dari Supabase
+      userId: map['user_id'], 
       qrCode: map['ticket_id'] ?? map['qr_code'] ?? '',
       namaWisata: map['nama_wisata'] ?? '',
       tanggalKunjungan: map['tanggal_kunjungan'] ?? '',
@@ -46,13 +46,13 @@ class PesananModel {
       previousHash: map['previous_hash'] ?? '',
       hash: map['hash'] ?? '',
       createdAt: map['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-      isUsed: (map['status'] ?? map['is_used']) == true, // 👈 Membaca status boolean dari kolom 'status' database
+      isUsed: (map['status'] ?? map['is_used']) == true, 
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'user_id': userId, // 👈 Disimpan ke Supabase
+      'user_id': userId, 
       'ticket_id': qrCode,
       'nama_wisata': namaWisata,
       'tanggal_kunjungan': tanggalKunjungan,
@@ -62,7 +62,7 @@ class PesananModel {
       'previous_hash': previousHash,
       'hash': hash,
       'created_at': createdAt,
-      'status': isUsed, // 👈 Disimpan ke kolom 'status' database Supabase
+      'status': isUsed, 
     };
   }
 }

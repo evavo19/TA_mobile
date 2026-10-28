@@ -7,16 +7,10 @@ import 'home_screen.dart';
 import 'profil_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  /// Tab yang aktif saat pertama dibuka:
-  /// 0 = Beranda, 1 = Tiket Saya, 2 = Asisten AI, 3 = Profil
   final int initialIndex;
 
   const MainScreen({super.key, this.initialIndex = 0});
 
-  /// TAMBAHAN: dipanggil dari Home (banner AI Rekomendasi).
-  /// Pindah ke tab Asisten AI (menu bawah tetap ada) lalu mengirim [pesan]
-  /// ke chatbot secara otomatis. Mengembalikan false kalau tidak ada MainScreen
-  /// di atas [context] (misal Home dibuka sendirian).
   static bool bukaAsistenAI(BuildContext context, String pesan) {
     final state = context.findAncestorStateOfType<_MainScreenState>();
     if (state == null) return false;
@@ -35,26 +29,21 @@ class _MainScreenState extends State<MainScreen> {
 
   static const double _notchMargin = 8.0;
   static const double _fabDiameter = 56.0;
-  static const double _fabDropOffset = 10.0; // makin besar, makin turun
+  static const double _fabDropOffset = 10.0; 
 
   @override
   void initState() {
     super.initState();
     _index = widget.initialIndex;
     _pages = [
-      // Tab 0: Beranda
+     
       const HomeScreen(),
-      // Tab 1: Tiket Saya
       const ETicketScreen(),
-      // Tab 2: Asisten AI
       const ChatbotScreen(),
-      // Tab 3: Profil
       const PlaceholderProfilScreen(),
     ];
   }
 
-  // TAMBAHAN: pindah ke tab Asisten AI, lalu titip pesan ke chatbot
-  // lewat chatbotPesanMasuk (dibaca & dikirim otomatis oleh ChatbotScreen).
   void _pindahKeAsistenAI(String pesan) {
     setState(() => _index = 2);
     chatbotPesanMasuk.value = pesan;
@@ -65,13 +54,11 @@ class _MainScreenState extends State<MainScreen> {
     const primaryColor = Color(0xFF1550B6);
 
     return Scaffold(
-      // Mencegah konten dan FAB ikut terdorong ke atas saat keyboard HP muncul
+      
       resizeToAvoidBottomInset: false,
 
-      // IndexedStack agar state halaman tidak hilang saat pindah menu
       body: IndexedStack(index: _index, children: _pages),
 
-      // Tombol Kompas (diturunkan sebesar _fabDropOffset)
       floatingActionButton: Transform.translate(
         offset: const Offset(0, _fabDropOffset),
         child: Container(
@@ -86,8 +73,7 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           child: FloatingActionButton(
-            // DITAMBAH: matikan animasi Hero (tombol "terbang" saat kembali
-            // dari halaman lain)
+
             heroTag: null,
             onPressed: () {
               Navigator.push(
@@ -107,14 +93,10 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
 
-      // Lokasi custom: tetap menempel di lekukan walau ada SnackBar
       floatingActionButtonLocation: const _DockedNoSnackBarLocation(),
 
-      // DITAMBAH: matikan animasi perpindahan posisi FAB
       floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
 
-      // Bottom bar: bayangan + isi putih digambar di belakang,
-      // garis border digambar di depan. Semua memakai satu path lekukan.
       bottomNavigationBar: CustomPaint(
         painter: _NotchedBarPainter(
           notchMargin: _notchMargin,
@@ -133,7 +115,7 @@ class _MainScreenState extends State<MainScreen> {
           drawBorder: true,
         ),
         child: BottomAppBar(
-          shape: null, // bentuk lekukan ditangani painter
+          shape: null, 
           color: Colors.transparent,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
@@ -150,7 +132,7 @@ class _MainScreenState extends State<MainScreen> {
                   1,
                   primaryColor,
                 ),
-                const SizedBox(width: 48), // Spasi tengah untuk tombol kompas
+                const SizedBox(width: 48), 
                 _buildNavItem(
                   Icons.smart_toy_rounded,
                   'Asisten AI',
@@ -166,7 +148,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Item navigasi custom supaya sejajar dengan notch
   Widget _buildNavItem(
     IconData icon,
     String label,
@@ -177,9 +158,9 @@ class _MainScreenState extends State<MainScreen> {
 
     return InkWell(
       onTap: () => setState(() => _index = index),
-      splashColor: Colors.transparent, // Menghilangkan efek gelombang sentuhan
+      splashColor: Colors.transparent, 
       highlightColor:
-          Colors.transparent, // Menghilangkan kotak abu-abu saat diklik
+          Colors.transparent, 
       child: Padding(
         padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
         child: Column(
@@ -207,9 +188,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-/// Lokasi FAB "centerDocked" versi sendiri.
-/// Bedanya dengan bawaan Flutter: posisinya TIDAK ikut naik saat SnackBar
-/// muncul, jadi tombol kompas selalu pas di lekukan bottom bar.
 class _DockedNoSnackBarLocation extends FloatingActionButtonLocation {
   const _DockedNoSnackBarLocation();
 
@@ -225,8 +203,6 @@ class _DockedNoSnackBarLocation extends FloatingActionButtonLocation {
   }
 }
 
-/// Menggambar bentuk bar dengan lekukan: bayangan + isi putih (di belakang)
-/// atau garis border tipis (di depan).
 class _NotchedBarPainter extends CustomPainter {
   final double notchMargin;
   final double fabDiameter;
@@ -246,7 +222,7 @@ class _NotchedBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Pusat FAB digeser turun sesuai offset
+   
     final fabRect = Rect.fromCenter(
       center: Offset(size.width / 2, fabDropOffset),
       width: fabDiameter,
@@ -259,7 +235,7 @@ class _NotchedBarPainter extends CustomPainter {
     );
 
     if (drawBorder) {
-      // Garis border tipis mengikuti lekukan
+
       canvas.drawPath(
         path,
         Paint()
@@ -268,7 +244,7 @@ class _NotchedBarPainter extends CustomPainter {
           ..strokeWidth = 1.0,
       );
     } else {
-      // Bayangan lembut ke atas, lalu isi bar putih mengikuti lekukan
+ 
       canvas.drawShadow(path, shadowColor, 6, false);
       canvas.drawPath(path, Paint()..color = Colors.white);
     }

@@ -13,10 +13,6 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  // Inisialisasi plugin notifikasi sudah dipindah ke NotificationService
-  // (dipanggil di main.dart), jadi tidak perlu lagi di halaman ini.
-
-  // Fungsi saat tombol diklik untuk meminta izin notifikasi sistem
   Future<void> _requestSystemNotificationPermission() async {
     try {
       debugPrint("Mencoba meminta izin notifikasi...");
@@ -43,7 +39,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     final List<Map<String, dynamic>> notifications = [];
 
-    // Jika ada data pesanan baru dari pembayaran, masukkan ke list paling atas
     if (widget.pesananBaru != null) {
       notifications.add({
         'title': 'Pembayaran Berhasil',
@@ -55,7 +50,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       });
     }
 
-    // Riwayat notifikasi default
     notifications.addAll([
       {
         'title': 'Promo Spesial Yogyakarta',
@@ -96,7 +90,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Tombol Interaktif untuk Meminta Izin Notifikasi Sistem
+    
           GestureDetector(
             onTap: () {
               debugPrint("Tombol izin diklik!");
@@ -149,7 +143,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Judul Riwayat Notifikasi
           Text(
             'Riwayat Notifikasi',
             style: GoogleFonts.poppins(
@@ -160,7 +153,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           const SizedBox(height: 12),
 
-          // List Daftar Notifikasi
           ...notifications.map((notif) {
             return Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -200,7 +192,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Dibungkus Expanded agar aman dari overflow
+                      
                             Expanded(
                               child: Text(
                                 notif['title'],

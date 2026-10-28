@@ -15,7 +15,6 @@ class _CompassScreenState extends State<CompassScreen> {
   @override
   void initState() {
     super.initState();
-    // Mendengarkan perubahan data arah kompas dari sensor perangkat
     FlutterCompass.events?.listen((CompassEvent event) {
       setState(() {
         _heading = event.heading;
@@ -23,7 +22,6 @@ class _CompassScreenState extends State<CompassScreen> {
     });
   }
 
-  // Fungsi untuk mengonversi nilai derajat angka menjadi keterangan arah mata angin
   String _getCardinalDirection(double? heading) {
     if (heading == null) return 'Menunggu Sensor...';
     if ((heading >= 337.5 && heading <= 360) || (heading >= 0 && heading < 22.5)) {
@@ -75,7 +73,7 @@ class _CompassScreenState extends State<CompassScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Visual Kompas Melingkar yang Berputar Sesuai Arah Perangkat
+     
               Transform.rotate(
                 angle: ((_heading ?? 0) * (3.1415926535 / 180) * -1),
                 child: Container(

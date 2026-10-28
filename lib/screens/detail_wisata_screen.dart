@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../models/user_model.dart';
 import '../models/wisata_model.dart';
 import 'booking_screen.dart';
@@ -20,7 +19,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   final _supabase = Supabase.instance.client;
   bool _isCheckingProfile = false;
 
-  // Pilihan Mata Uang & Kurs Konversi (Simulasi)
   String _selectedCurrency = 'IDR';
   final Map<String, double> _currencyRates = {
     'IDR': 1.0,
@@ -36,7 +34,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     'JPY': '¥ ',
   };
 
-  // Pilihan Zona Waktu & Perbedaan Jam dari WIB
   String _selectedTimeZone = 'WIB';
   final Map<String, int> _timeZoneOffsets = {
     'WIB': 0,
@@ -45,7 +42,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     'London': -6,
   };
 
-  // Helper Menghitung Harga Terkonversi
   String _getFormattedPrice(int hargaRupiah) {
     double rate = _currencyRates[_selectedCurrency] ?? 1.0;
     String symbol = _currencySymbols[_selectedCurrency] ?? 'Rp ';
@@ -58,7 +54,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     }
   }
 
-  // Helper Menghitung Konversi Jam Buka
   String _getConvertedJamBuka(String jamBukaWib) {
     int offset = _timeZoneOffsets[_selectedTimeZone] ?? 0;
     if (offset == 0) return jamBukaWib;
@@ -84,7 +79,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     }
   }
 
-  // FUNGSI CEK KELENGKAPAN PROFIL SEBELUM PESAN TIKET
   Future<void> _checkProfileAndBooking() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -105,8 +99,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       if (response == null) {
         isProfileIncomplete = true;
       } else {
-        // Pakai UserModel yang SAMA dengan halaman profil, supaya nama kolom
-        // di database pasti cocok (tidak menebak 'full_name' / 'fullName' dst).
+
         final model = UserModel.fromJson(Map<String, dynamic>.from(response));
         final String fullName = (model.fullName as String?) ?? '';
         final String phone = (model.phone as String?) ?? '';
@@ -128,7 +121,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       if (!mounted) return;
 
       if (isProfileIncomplete) {
-        // Tampilkan Pop-up Peringatan
+  
         showDialog(
           context: context,
           builder: (dialogContext) => Dialog(
@@ -205,19 +198,16 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () async {
-                            Navigator.pop(dialogContext); // Tutup pop-up
-
-                            // Masuk ke halaman profil, tunggu sampai user kembali
+                            Navigator.pop(dialogContext); 
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                // Buka MainScreen di tab Profil (index 3) supaya navbar tetap ada
+                                
                                 builder: (context) =>
                                     const MainScreen(initialIndex: 3),
                               ),
                             );
 
-                            // Setelah kembali dari profil, cek ulang kelengkapannya
                             if (!mounted) return;
                             _checkProfileAndBooking();
                           },
@@ -247,7 +237,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
           ),
         );
       } else {
-        // Jika sudah lengkap, lanjut ke halaman Booking
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -278,7 +268,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header Foto Wisata
                 Stack(
                   children: [
                     Image.network(
@@ -325,7 +314,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                   ],
                 ),
 
-                // Konten Detail
                 Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
@@ -391,7 +379,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                       const Divider(),
                       const SizedBox(height: 12),
 
-                      // Filter Mata Uang & Jam
                       Row(
                         children: [
                           Expanded(

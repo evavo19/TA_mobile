@@ -1,9 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../models/blockchain_model.dart';
 
-/// Hasil pemeriksaan blockchain: valid atau tidak, beserta alasannya.
 class HasilVerifikasi {
   final bool valid;
   final String pesan;
@@ -36,9 +34,6 @@ class BlockchainService {
     return _genesisHash;
   }
 
-  /// Mengembalikan hash blok yang BENAR-BENAR tersimpan di Supabase.
-  /// Jika gagal, error di-lempar ulang (rethrow) supaya layar pemesanan
-  /// tahu bahwa penyimpanan gagal dan tidak menampilkan "Pembayaran Berhasil".
   static Future<String> tambahBlok({
     String? userId,
     required String ticketId,
@@ -52,7 +47,6 @@ class BlockchainService {
       throw Exception('User belum login. Silakan login terlebih dahulu.');
     }
 
-    // Rapikan angka desimal (contoh: 95.99999999 -> 96.0)
     final double hargaBersih = double.parse(totalHarga.toStringAsFixed(2));
 
     final String previousHash = await _getPreviousHash();
@@ -81,7 +75,7 @@ class BlockchainService {
     );
 
     final mapData = newBlock.toMap();
-    mapData.remove('id'); // biarkan database yang mengisi id (auto increment)
+    mapData.remove('id'); 
     mapData['user_id'] = userId;
     mapData['mata_uang'] = mataUang;
 
@@ -100,10 +94,6 @@ class BlockchainService {
     }
   }
 
-
-  /// Kandidat format `created_at`. Kalau kolom di database bertipe timestamptz,
-  /// Supabase mengembalikan format berbeda dari string aslinya, jadi kita coba
-  /// beberapa bentuk yang setara sebelum menyatakan hash tidak cocok.
   static List<String> _kandidatCreatedAt(String raw) {
     final hasil = <String>{raw};
     try {
@@ -118,8 +108,6 @@ class BlockchainService {
     return hasil.toList();
   }
 
-  /// Menghitung ulang hash sebuah blok dari data yang tersimpan,
-  /// lalu membandingkannya dengan hash yang tersimpan di database.
   static bool _hashBlokValid(Map<String, dynamic> row) {
     final blok = BlockchainModel.fromMap(row);
     for (final createdAt in _kandidatCreatedAt(blok.createdAt)) {
@@ -137,10 +125,6 @@ class BlockchainService {
     return false;
   }
 
-  /// Verifikasi satu tiket:
-  /// 1. blok ada di database,
-  /// 2. hash dihitung ulang dari isi data (mendeteksi data yang diubah),
-  /// 3. previous_hash cocok dengan hash blok sebelumnya (mendeteksi rantai putus).
   static Future<HasilVerifikasi> verifikasiDetail(
     String ticketId,
     String hash,
@@ -176,7 +160,6 @@ class BlockchainService {
           .limit(1)
           .maybeSingle();
 
-      // Blok pertama di tabel tidak punya blok sebelumnya, jadi dilewati.
       if (sebelumnya != null && sebelumnya['hash'] != row['previous_hash']) {
         return HasilVerifikasi(
           false,
@@ -196,9 +179,7 @@ class BlockchainService {
     final hasil = await verifikasiDetail(ticketId, hash);
     return hasil.valid;
   }
-
-  /// Memeriksa seluruh rantai dari blok pertama sampai terakhir.
-  /// Berhenti di blok pertama yang rusak dan mengembalikan id-nya.
+  
   static Future<HasilVerifikasi> validasiRantai() async {
     try {
       final data = await _supabase

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -13,7 +12,7 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  // Game State
+
   bool _isPlaying = false;
   bool _isGameOver = false;
   int _score = 0;
@@ -22,17 +21,13 @@ class _QuizScreenState extends State<QuizScreen> {
   Timer? _spawnTimer;
   StreamSubscription? _accelerometerSubscription;
 
-  // Target skor untuk menang
   static const int _targetScore = 60;
 
-  // Koin: static agar jumlahnya tetap ada selama aplikasi berjalan
-  static int _totalKoin = 0; // total koin yang dimiliki pengguna
-  int _koinDidapat = 0; // koin dari permainan ini
+  static int _totalKoin = 0; 
+  int _koinDidapat = 0;
 
-  // Posisi Keranjang (0.0 sampai 1.0)
   double _basketX = 0.5;
 
-  // List Item yang Jatuh
   final List<_FallingItem> _items = [];
   final Random _random = Random();
 
@@ -42,17 +37,14 @@ class _QuizScreenState extends State<QuizScreen> {
     _initSensor();
   }
 
-  // Fungsi untuk membaca sensor akselerometer (kemiringan HP)
   void _initSensor() {
     _accelerometerSubscription = accelerometerEventStream().listen((event) {
       if (!_isPlaying) return;
 
       setState(() {
-        // Sumbu Y pada event akselerometer mendeteksi kemiringan kiri-kanan HP
-        // Kita kalikan faktor pengali (misal 0.05) agar pergerakan keranjang mulus dan tidak terlalu ngebut
+       
         _basketX -= event.y * 0.04;
 
-        // Batasi agar keranjang tidak keluar layar (antara 0.05 sampai 0.95)
         _basketX = _basketX.clamp(0.05, 0.95);
       });
     });
@@ -68,7 +60,6 @@ class _QuizScreenState extends State<QuizScreen> {
       _basketX = 0.5;
     });
 
-    // Timer Hitung Mundur Game (15 detik)
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timeLeft > 1) {
         setState(() {
@@ -79,7 +70,6 @@ class _QuizScreenState extends State<QuizScreen> {
       }
     });
 
-    // Loop Spawn Item Jatuh & Update Posisi
     _spawnTimer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
       if (!_isPlaying) return;
 
@@ -116,10 +106,10 @@ class _QuizScreenState extends State<QuizScreen> {
 
   _ItemType _getRandomItemType() {
     double rand = _random.nextDouble();
-    if (rand < 0.40) return _ItemType.ticket; // 40% Tiket (+10)
-    if (rand < 0.65) return _ItemType.coin; // 25% Koin (+20)
-    if (rand < 0.85) return _ItemType.bomb; // 20% Bom (-20)
-    return _ItemType.zonk; // 15% Zonk (-30)
+    if (rand < 0.40) return _ItemType.ticket; 
+    if (rand < 0.65) return _ItemType.coin; 
+    if (rand < 0.85) return _ItemType.bomb; 
+    return _ItemType.zonk; 
   }
 
   void _applyItemScore(_ItemType type) {
@@ -145,7 +135,6 @@ class _QuizScreenState extends State<QuizScreen> {
     _gameTimer?.cancel();
     _spawnTimer?.cancel();
 
-    // Skor akhir dikonversi menjadi koin lalu ditambahkan ke total koin
     _koinDidapat = _score;
     _totalKoin += _koinDidapat;
 
@@ -368,7 +357,6 @@ class _QuizScreenState extends State<QuizScreen> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        // Menampilkan total koin yang dimiliki pengguna
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 14),
@@ -396,7 +384,6 @@ class _QuizScreenState extends State<QuizScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Panel Informasi Skor & Waktu
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               color: Colors.white,
@@ -439,7 +426,6 @@ class _QuizScreenState extends State<QuizScreen> {
               ),
             ),
 
-            // Arena Game
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {

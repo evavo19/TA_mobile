@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../models/wisata_model.dart';
 import '../services/blockchain_service.dart';
 import '../services/notifikasi_service.dart';
@@ -195,7 +194,6 @@ class _BookingScreenState extends State<BookingScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
 
-    // Jangan lanjut kalau penyimpanan gagal
     if (!berhasil || !mounted) return;
 
     NotificationService.show(
@@ -210,7 +208,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
-      Navigator.pop(context, true); // true = tiket baru berhasil dibuat
+      Navigator.pop(context, true); 
     });
   }
 

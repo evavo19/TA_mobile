@@ -13,7 +13,7 @@ class ScanTicketScreen extends StatefulWidget {
 class _ScanTicketScreenState extends State<ScanTicketScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _isLoading = false;
-  bool _isProcessing = false; // 👈 Proteksi agar tidak scan berulang/berkedip
+  bool _isProcessing = false; 
   String? _message;
   bool _isSuccess = false;
   Map<String, dynamic>? _scannedTicketData;
@@ -50,13 +50,12 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
     if (qrData.isEmpty || _isProcessing) return;
 
     setState(() {
-      _isProcessing = true; // 👈 Matikan scanner sementara
+      _isProcessing = true; 
       _isLoading = true;
       _message = null;
       _scannedTicketData = null;
     });
 
-    // 🛑 Hentikan kamera fisik agar tidak membaca frame berkedip
     try {
       await cameraController.stop();
     } catch (_) {}
@@ -64,14 +63,13 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
     final supabase = Supabase.instance.client;
 
     try {
-      // Cari tiket di Supabase berdasarkan ticket_id
       final response = await supabase
           .from('blockchain_tiket')
           .select()
           .ilike('ticket_id', '%$qrData%')
           .limit(
             1,
-          ) // cegah error "multiple rows" jika ada lebih dari satu yang cocok
+          ) 
           .maybeSingle();
 
       if (!mounted) return;
@@ -98,7 +96,6 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
         return;
       }
 
-      // UPDATE status di database menjadi true (hangus)
       await supabase
           .from('blockchain_tiket')
           .update({'status': true})
@@ -124,13 +121,12 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
     }
   }
 
-  // Fungsi untuk mereset scanner agar bisa scan tiket berikutnya
   void _resetScanner() {
     setState(() {
       _controller.clear();
       _message = null;
       _scannedTicketData = null;
-      _isProcessing = false; // Aktifkan kembali scanner
+      _isProcessing = false; 
     });
     cameraController.start();
   }
@@ -184,7 +180,6 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Kamera Scanner dengan Proteksi _isProcessing (Tidak berkedip)
             Container(
               height: 220,
               decoration: BoxDecoration(
@@ -197,7 +192,7 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                   controller: cameraController,
                   onDetect: (capture) {
                     if (_isProcessing || _isLoading) {
-                      return; // Mencegah scan bertubi-tubi
+                      return; 
                     }
                     final List<Barcode> barcodes = capture.barcodes;
                     for (final barcode in barcodes) {
@@ -260,7 +255,6 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                 ),
                 if (_message != null) ...[
                   const SizedBox(width: 10),
-                  // Tombol reset untuk scan tiket berikutnya
                   IconButton(
                     onPressed: _resetScanner,
                     icon: const Icon(

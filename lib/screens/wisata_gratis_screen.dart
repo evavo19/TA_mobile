@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../models/wisata_model.dart';
 import '../services/wisata_service.dart' as wisata_svc;
 import 'detail_wisata_screen.dart';
@@ -24,9 +23,6 @@ class _WisataGratisScreenState extends State<WisataGratisScreen> {
     _wisataFuture = _fetchWisataGratis();
   }
 
-  /// Online  -> Supabase (lalu disimpan ke SQLite)
-  /// Offline -> SQLite lokal
-  /// Setelah itu disaring: hanya wisata dengan harga tiket 0 (gratis).
   Future<List<WisataModel>> _fetchWisataGratis() async {
     final data = await wisata_svc.WisataService().getWisataList();
     return data
@@ -42,7 +38,7 @@ class _WisataGratisScreenState extends State<WisataGratisScreen> {
    appBar: AppBar(
   backgroundColor: primaryColor,
   elevation: 0,
-  centerTitle: true, // samakan dengan layar Terdekat
+  centerTitle: true, 
   leading: IconButton(
     icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
     onPressed: () => Navigator.pop(context),

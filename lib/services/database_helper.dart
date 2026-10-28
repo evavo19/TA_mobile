@@ -19,10 +19,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2, // DIUBAH: naik dari 1 ke 2 karena kolom foto_uri -> foto_url
+      version: 2, 
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
-        // Cache saja, jadi aman dibuat ulang. Data terisi lagi saat online.
         await db.execute('DROP TABLE IF EXISTS wisata');
         await _createDB(db, newVersion);
       },
@@ -30,7 +29,6 @@ class DatabaseHelper {
   }
 
   Future _createDB(Database db, int version) async {
-    // Nama kolom disamakan dengan Supabase: foto_url
     await db.execute('''
       CREATE TABLE wisata (
         id INTEGER PRIMARY KEY,
@@ -48,7 +46,6 @@ class DatabaseHelper {
     ''');
   }
 
-  // Simpan / update satu data
   Future<void> insertWisata(Map<String, dynamic> row) async {
     final db = await instance.database;
     await db.insert(
@@ -58,15 +55,11 @@ class DatabaseHelper {
     );
   }
 
-  // Ambil semua data dari SQLite lokal
   Future<List<Map<String, dynamic>>> getLocalWisata() async {
     final db = await instance.database;
     return await db.query('wisata', orderBy: 'id ASC');
   }
 
-  // Simpan banyak data sekaligus (dipanggil setelah fetch dari Supabase)
-  // DIUBAH: tabel dikosongkan dulu dalam batch yang sama, supaya data yang
-  // dihapus di Supabase ikut hilang di SQLite.
   Future<void> saveAllWisataToLocal(List<dynamic> wisataList) async {
     final db = await instance.database;
     final batch = db.batch();
@@ -81,7 +74,6 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
-  // Cek apakah cache lokal sudah terisi
   Future<bool> hasLocalData() async {
     final db = await instance.database;
     final count = Sqflite.firstIntValue(
@@ -90,13 +82,11 @@ class DatabaseHelper {
     return (count ?? 0) > 0;
   }
 
-  // Hapus semua data (misal sebelum sinkronisasi ulang)
   Future<void> clearWisata() async {
     final db = await instance.database;
     await db.delete('wisata');
   }
 
-  // Ambil hanya kolom yang ada di tabel lokal
   Map<String, dynamic> _toLocalRow(Map<String, dynamic> item) {
     return {
       'id': item['id'],
@@ -108,7 +98,7 @@ class DatabaseHelper {
       'harga_weekend': item['harga_weekend'],
       'latitude': item['latitude'],
       'longitude': item['longitude'],
-      'foto_url': item['foto_url'], // DIUBAH: dari foto_uri
+      'foto_url': item['foto_url'], 
       'deskripsi': item['deskripsi'],
     };
   }

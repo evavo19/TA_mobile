@@ -27,7 +27,6 @@ class SplashScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Image.asset(
                 'assets/LogoLelungan2.png',
-                // 90% lebar layar (ubah 0.9 jadi 0.8 untuk lebih kecil, 1.0 untuk penuh)
                 width: MediaQuery.of(context).size.width * 1.0,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => Container(

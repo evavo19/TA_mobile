@@ -4,7 +4,6 @@ import 'package:local_auth/local_auth.dart';
 class BiometricService {
   static final LocalAuthentication _auth = LocalAuthentication();
 
-  // 1. Cek apakah perangkat mendukung biometrik (Sidik Jari / Face ID)
   static Future<bool> apakahBiometrikTersedia() async {
     try {
       final bool canAuthenticateWithBiometrics = await _auth.canCheckBiometrics;
@@ -17,7 +16,6 @@ class BiometricService {
     }
   }
 
-  // 2. Jalankan proses pemindaian biometrik
   static Future<bool> autentikasiBiometrik() async {
     try {
       final bool didAuthenticate = await _auth.authenticate(

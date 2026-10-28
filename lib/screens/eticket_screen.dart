@@ -1,4 +1,4 @@
-import 'dart:async'; // Diperlukan untuk StreamSubscription
+import 'dart:async'; 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -21,11 +21,10 @@ class _ETicketScreenState extends State<ETicketScreen> {
   PesananModel? _directPesanan;
   List<PesananModel> _listPesanan = [];
   bool _isVerified = true;
-  bool _isVerifying = true; // true selama hash sedang dihitung ulang
+  bool _isVerifying = true; 
   bool _isLoading = true;
   String _displayHash = '';
 
-  // Langganan stream untuk Supabase Realtime
   StreamSubscription? _ticketSubscription;
 
   @override
@@ -41,23 +40,19 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
       _verifyBlockchainData(_directPesanan!.qrCode, h);
 
-      // Dengarkan perubahan real-time untuk detail tiket tunggal ini
       _subscribeToSingleTicket(_directPesanan!.id);
     } else {
       _loadUserTickets();
-      // Dengarkan perubahan real-time untuk daftar tiket pengguna
+
       _subscribeToUserTickets();
     }
   }
 
   @override
   void dispose() {
-    // Batalkan stream listener saat layar ditutup agar tidak terjadi memory leak
     _ticketSubscription?.cancel();
     super.dispose();
   }
-
-  // 1. Real-time Stream untuk Daftar Tiket (Daftar Banyak Tiket)
   void _subscribeToUserTickets() {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
@@ -78,7 +73,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
     });
   }
 
-  // 2. Real-time Stream untuk Detail Tiket Tunggal
   void _subscribeToSingleTicket(dynamic ticketId) {
     final supabase = Supabase.instance.client;
 
@@ -95,7 +89,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
     });
   }
 
-  // Lama minimal status "Memverifikasi..." tampil, supaya terlihat jelas oleh user
   static const Duration _jedaMinimalVerifikasi = Duration(milliseconds: 1500);
 
   Future<void> _verifyBlockchainData(String qrCode, String currentHash) async {
@@ -107,7 +100,6 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
     debugPrint('Verifikasi blockchain: ${hasil.valid} - ${hasil.pesan}');
 
-    // Kalau verifikasi selesai lebih cepat dari jeda minimal, tunggu sisanya
     final sisa = _jedaMinimalVerifikasi - DateTime.now().difference(mulai);
     if (sisa > Duration.zero) {
       await Future.delayed(sisa);
@@ -115,7 +107,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
     if (mounted) {
       setState(() {
-        _isVerified = hasil.valid; // hasil asli, tidak lagi selalu true
+        _isVerified = hasil.valid; 
         _isVerifying = false;
       });
     }
@@ -154,13 +146,11 @@ class _ETicketScreenState extends State<ETicketScreen> {
     }
   }
 
-  // Mata uang dibaca dari kolom 'mata_uang' di database (sesuai pilihan user saat memesan)
   String _dapatkanMataUang(PesananModel item) {
     final kode = item.mataUang.trim().toUpperCase();
     return kode.isEmpty ? 'IDR' : kode;
   }
 
-  // IDR dan JPY tanpa desimal, USD dan EUR dua desimal
   String _formatTotal(PesananModel item) {
     final kode = _dapatkanMataUang(item);
     final desimal = (kode == 'IDR' || kode == 'JPY') ? 0 : 2;

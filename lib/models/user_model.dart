@@ -5,7 +5,7 @@ class UserModel {
   final String phone;
   final String age;
   final String address;
-  final String? gender; // Nullable agar tidak ter-hardcode ke Perempuan/Laki-laki
+  final String? gender; 
   final String? fotoUrl;
 
   const UserModel({
@@ -15,11 +15,10 @@ class UserModel {
     this.phone = '',
     this.age = '',
     this.address = '',
-    this.gender, // Mengizinkan null secara fleksibel
+    this.gender, 
     this.fotoUrl,
   });
 
-  /// Mengambil data dari baris tabel `profiles` di Supabase
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String? ?? '',
@@ -28,12 +27,11 @@ class UserModel {
       phone: json['phone'] as String? ?? '',
       age: json['age']?.toString() ?? '',
       address: json['address'] as String? ?? '',
-      gender: json['gender'] as String?, // Murni dari database, tidak di-hardcode
+      gender: json['gender'] as String?, 
       fotoUrl: json['foto_url'] as String?,
     );
   }
 
-  /// Format data yang dikirim untuk update/upsert ke Supabase
   Map<String, dynamic> toUpdateJson() {
     return {
       'fullName': fullName,

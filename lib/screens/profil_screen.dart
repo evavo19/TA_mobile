@@ -14,8 +14,6 @@ import '../models/user_model.dart';
 import '../services/gps_service.dart';
 
 class PlaceholderProfilScreen extends StatefulWidget {
-  /// true jika halaman ini dibuka lewat Navigator.push (misal dari Detail Wisata),
-  /// sehingga perlu tombol kembali. Di tab Profil (MainScreen) biarkan false.
   final bool showBackButton;
 
   const PlaceholderProfilScreen({super.key, this.showBackButton = false});

@@ -7,20 +7,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-// Import model dan screen detail wisata
 import '../models/wisata_model.dart';
 import '../screens/detail_wisata_screen.dart';
-// TAMBAHAN: data wisata lengkap (Supabase -> SQLite) untuk rekomendasi terdekat & favorit
 import '../services/wisata_service.dart' as wisata_svc;
 
-// TAMBAHAN: "kotak surat" untuk mengirim pesan ke chatbot dari luar (dipakai banner Home
-// lewat MainScreen saat chatbot berjalan sebagai tab). Nilai akan dikosongkan setelah dibaca.
 final ValueNotifier<String?> chatbotPesanMasuk = ValueNotifier<String?>(null);
 
 class ChatbotScreen extends StatefulWidget {
-  // TAMBAHAN: pesan yang dikirim otomatis saat halaman dibuka (dipakai banner Home).
-  // Kalau null, halaman berjalan seperti biasa.
+
   final String? pesanAwal;
 
   const ChatbotScreen({super.key, this.pesanAwal});
@@ -37,12 +31,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   late final String _geminiApiKey;
   late final GenerativeModel _model;
   bool _isLoading = false;
-  bool _loadingHasImage = false; // untuk teks loading yang sesuai
+  bool _loadingHasImage = false; 
 
-  // Variabel untuk menampung bytes foto yang di-upload user
   Uint8List? _selectedImageBytes;
 
-  // GPS User Location (Default: Malioboro)
   double _userLat = -7.7926;
   double _userLng = 110.3658;
   String _currentLocationName = 'Malioboro, Yogyakarta';
@@ -64,8 +56,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _initGemini();
     final gps = _initUserGps();
 
-    // TAMBAHAN: kalau dibuka dari banner Home, kirim pesan awal otomatis
-    // setelah GPS selesai (maks 8 detik) supaya jarak dihitung dari lokasi asli.
     if (widget.pesanAwal != null) {
       gps
           .timeout(const Duration(seconds: 8), onTimeout: () {})
@@ -74,13 +64,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       });
     }
 
-    // TAMBAHAN: saat chatbot berjalan sebagai tab, dengarkan pesan dari banner Home
     if (widget.pesanAwal == null) {
       chatbotPesanMasuk.addListener(_onPesanMasuk);
     }
   }
 
-  // TAMBAHAN: ambil pesan dari "kotak surat", kosongkan, lalu kirim otomatis
   void _onPesanMasuk() {
     final pesan = chatbotPesanMasuk.value;
     if (pesan == null) return;
@@ -98,9 +86,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   void _initGemini() {
     _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    // (debugPrint API key dihapus supaya key tidak muncul di log)
 
-    // Model terbaru (gemini-1.5-* dan gemini-2.5-flash sudah tidak tersedia untuk user baru)
     _model = GenerativeModel(
       model: 'gemini-3.8-flash',
       apiKey: _geminiApiKey,
@@ -151,21 +137,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     return 12742 * asin(sqrt(a));
   }
 
-  // ===========================================================================
-  // TAMBAHAN: REKOMENDASI TERDEKAT & FAVORIT DARI SELURUH DATA WISATA
-  // ===========================================================================
-
-  // Skor favorit = rating x log(jumlah ulasan + 1)
-  // Wisata yang ratingnya bagus DAN banyak diulas naik ke atas.
   double _skorFavorit(Map<String, dynamic> w) {
     final rating = (w['rating'] as num?)?.toDouble() ?? 0;
     final ulasan = (w['jumlah_ulasan'] as num?)?.toDouble() ?? 0;
     return rating * log(ulasan + 1);
   }
 
-  // Ambil semua data wisata (online -> Supabase, offline -> SQLite),
-  // hitung jarak dari posisi user, lalu urutkan jadi 2 daftar.
-  // Bentuk tiap item dibuat sama dengan kartu chatbot (jarak, harga, foto_url).
   Future<Map<String, List<Map<String, dynamic>>>> _rekomendasiLokal() async {
     final data = await wisata_svc.WisataService().getWisataList();
 
@@ -197,7 +174,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     return {'terdekat': terdekat, 'favorit': favorit};
   }
 
-  // Fungsi Pilih Gambar dari Galeri atau Kamera
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -218,7 +194,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     }
   }
 
-  // Fungsi Kirim Pesan (Mendukung Teks + Gambar Multimodal yang Aman)
+ 
   Future<void> _sendMessage(String text) async {
     if ((text.trim().isEmpty && _selectedImageBytes == null) || _isLoading) {
       return;
@@ -239,7 +215,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         'time': _getCurrentTime(),
         'imageBytes': currentImageBytes,
       });
-      _selectedImageBytes = null; // Reset preview setelah dikirim
+      _selectedImageBytes = null; 
       _loadingHasImage = currentImageBytes != null;
       _isLoading = true;
     });
@@ -247,7 +223,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _scrollToBottom();
 
     try {
-      // 1. Ambil data wisata dari Supabase sebagai referensi
       List<Map<String, dynamic>> wisataList = [];
       try {
         final List<dynamic> allData = await Supabase.instance.client
@@ -271,9 +246,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         debugPrint("Error fetching Supabase: $dbError");
       }
 
-      // TAMBAHAN: kalau user minta "terdekat" / "favorit" (tanpa foto), hitung dari
-      // SELURUH data wisata (bukan hanya 50 pertama), lalu jadikan konteks untuk
-      // Gemini dan tampilkan sebagai kartu.
       String konteksTambahan = '';
       List<Map<String, dynamic>>? kartuLokal;
 
@@ -319,7 +291,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         ].where((w) => ids.add(w['id'])).toList();
       }
 
-      // 2. Siapkan Part Content untuk Gemini AI
       List<Part> contentParts = [];
 
       if (currentImageBytes != null) {
@@ -341,16 +312,14 @@ Instruksi untuk AI:
 - Jawablah dengan ramah dan natural.
 ''';
 
-      prompt += konteksTambahan; // TAMBAHAN: data terdekat / favorit (kalau diminta)
+      prompt += konteksTambahan; 
 
       contentParts.add(TextPart(prompt));
 
-      // 3. Kirim request multimodal ke Gemini Model secara langsung
       final response =
           await _generateWithRetry([Content.multi(contentParts)]);
       String responseText = response.text ?? 'Tidak ada respons dari AI.';
 
-      // 4. Pencocokan Kartu Berdasarkan Nama Tempat di Respon AI
       List<Map<String, dynamic>> matchedCards = [];
       for (var item in wisataList) {
         String namaWisata = item['nama'].toString().toLowerCase();
@@ -366,13 +335,10 @@ Instruksi untuk AI:
         }
       }
 
-      // TAMBAHAN: untuk permintaan terdekat / favorit, kartu diambil dari hasil
-      // perhitungan seluruh data (bukan dari pencocokan nama).
       if (kartuLokal != null && kartuLokal.isNotEmpty) {
         matchedCards = kartuLokal;
       }
 
-      // Jika user bertanya soal terdekat via teks/quick chip tanpa foto
       if (matchedCards.isEmpty &&
           currentImageBytes == null &&
           (userText.toLowerCase().contains('terdekat') ||
@@ -417,7 +383,6 @@ Instruksi untuk AI:
     }
   }
 
-  // Otomatis coba ulang (maks 3x) kalau server Gemini sedang sibuk (503) / kena limit (429)
   Future<GenerateContentResponse> _generateWithRetry(
       List<Content> content) async {
     const maxAttempts = 3;
@@ -460,7 +425,7 @@ Instruksi untuk AI:
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        // TAMBAHAN: tombol kembali hanya muncul kalau dibuka dari banner Home
+       
         leading: widget.pesanAwal != null
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
@@ -502,7 +467,7 @@ Instruksi untuk AI:
       ),
       body: Column(
         children: [
-          // List Messages
+        
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -759,7 +724,7 @@ Instruksi untuk AI:
               ),
             ),
 
-          // Quick Chips
+    
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -787,14 +752,13 @@ Instruksi untuk AI:
             ),
           ),
 
-          // Input Bar dengan Tombol Galeri/Kamera di Kiri
           Container(
             padding: const EdgeInsets.all(12),
             color: Colors.white,
             child: SafeArea(
               child: Row(
                 children: [
-                  // Tombol Ikon Upload Foto
+              
                   IconButton(
                     icon: const Icon(Icons.image_outlined,
                         color: Color(0xFF1550B6)),

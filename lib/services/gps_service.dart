@@ -8,9 +8,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-// SESUAIKAN path ini dengan lokasi wisata_service.dart di projectmu.
-// Kalau file ini ada di lib/services/ (satu folder), cukup seperti di bawah.
 import 'wisata_service.dart';
 
 class LbsScreen extends StatefulWidget {
@@ -23,26 +20,20 @@ class LbsScreen extends StatefulWidget {
 class _LbsScreenState extends State<LbsScreen> {
   final MapController _mapController = MapController();
 
-  // Default: UPN "Veteran" Yogyakarta Kampus 2 Babarsari.
-  // Koordinat ini perkiraan, cek ulang lewat Google Maps (tekan lama di titik kampus).
   static const LatLng _defaultLocation = LatLng(-7.7790, 110.4140);
   static const String _defaultLocationName =
       'UPN Kampus 2 Babarsari (Lokasi Default)';
 
-  // GPS Device Location
   LatLng _userLocation = _defaultLocation;
   String _currentLocationName = 'Mendapatkan lokasi GPS...';
   bool _isLoading = true;
 
-  // Destinasi terpilih untuk garis rute (Polyline)
   LatLng? _selectedDestination;
   String? _selectedDestinationName;
 
-  // Filter radius jarak
   String _selectedRadius = 'Semua';
   final List<String> _radiusOptions = ['< 5 km', '< 10 km', '< 20 km', 'Semua'];
 
-  // Data wisata (Supabase kalau online, SQLite kalau offline)
   List<Map<String, dynamic>> _allWisata = [];
 
   @override
@@ -51,7 +42,6 @@ class _LbsScreenState extends State<LbsScreen> {
     _fetchLocationAndWisata();
   }
 
-  // Hitung jarak Haversine (km)
   double _calculateDistance(
     double lat1,
     double lon1,
@@ -66,8 +56,6 @@ class _LbsScreenState extends State<LbsScreen> {
     return 12742 * asin(sqrt(a));
   }
 
-  // Konversi WGS84 latitude/longitude -> UTM.
-  // Contoh hasil: "49M 4xxxxx mE 9xxxxxx mN"
   String _toUtm(double lat, double lon) {
     const a = 6378137.0;
     const f = 1 / 298.257223563;
@@ -121,8 +109,6 @@ class _LbsScreenState extends State<LbsScreen> {
         '${northing.toStringAsFixed(0)} mN';
   }
 
-  // Minta Cloudinary kirim thumbnail JPEG standar 200x200.
-  // Menyelesaikan gambar yang gagal di-decode dan memperkecil ukuran unduhan.
   String _thumb(String url) {
     if (url.contains('res.cloudinary.com') && url.contains('/upload/')) {
       return url.replaceFirst(
@@ -133,7 +119,6 @@ class _LbsScreenState extends State<LbsScreen> {
     return url;
   }
 
-  // Satu baris koordinat: label di kiri (lebar tetap), nilai di kanan.
   Widget _coordRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
@@ -166,7 +151,6 @@ class _LbsScreenState extends State<LbsScreen> {
     );
   }
 
-  // Buka Google Maps aplikasi eksternal
   Future<void> _openGoogleMaps(double lat, double lng) async {
     final Uri googleMapsUrl = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
@@ -187,7 +171,6 @@ class _LbsScreenState extends State<LbsScreen> {
   Future<void> _fetchLocationAndWisata() async {
     setState(() => _isLoading = true);
 
-    // 1. Ambil koordinat GPS HP
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (serviceEnabled) {
@@ -198,7 +181,7 @@ class _LbsScreenState extends State<LbsScreen> {
         if (permission == LocationPermission.whileInUse ||
             permission == LocationPermission.always) {
           final position = await Geolocator.getCurrentPosition(
-            // DIUBAH: desiredAccuracy sudah deprecated
+            
             locationSettings: const LocationSettings(
               accuracy: LocationAccuracy.high,
             ),
@@ -218,10 +201,9 @@ class _LbsScreenState extends State<LbsScreen> {
       _currentLocationName = _defaultLocationName;
     }
 
-    // 2. Ambil data wisata
     List<dynamic> data;
     try {
-      // DIUBAH: lewat WisataService -> Supabase kalau online, SQLite kalau offline
+     
       data = await WisataService().getWisataList();
     } catch (e) {
       if (!mounted) return;
@@ -232,12 +214,11 @@ class _LbsScreenState extends State<LbsScreen> {
       return;
     }
 
-    // 3. Olah & hitung jarak tiap wisata dari posisi user
     final List<Map<String, dynamic>> loadedWisata = [];
     for (final item in data) {
       final lat = (item['latitude'] as num?)?.toDouble();
       final lng = (item['longitude'] as num?)?.toDouble();
-      if (lat == null || lng == null) continue; // lewati data tanpa koordinat
+      if (lat == null || lng == null) continue; 
 
       final distance = _calculateDistance(
         _userLocation.latitude,
@@ -259,7 +240,6 @@ class _LbsScreenState extends State<LbsScreen> {
       });
     }
 
-    // Urutkan dari yang terdekat
     loadedWisata.sort(
       (a, b) => (a['jarak'] as double).compareTo(b['jarak'] as double),
     );
@@ -270,8 +250,6 @@ class _LbsScreenState extends State<LbsScreen> {
       _isLoading = false;
     });
 
-    // DIUBAH: tunggu peta selesai dibangun dulu, baru geser kamera.
-    // (Sebelumnya move() dipanggil sebelum FlutterMap ada -> LateInitializationError)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _mapController.move(_userLocation, 12.0);
@@ -296,7 +274,6 @@ class _LbsScreenState extends State<LbsScreen> {
       _selectedDestinationName = name;
     });
 
-    // Geser kamera peta ke lokasi tujuan
     _mapController.move(targetLocation, 14.0);
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -323,7 +300,6 @@ class _LbsScreenState extends State<LbsScreen> {
     const primaryColor = Color(0xFF1550B6);
     final wisataTampil = _filteredWisata;
 
-    // Titik yang ditampilkan koordinatnya: destinasi terpilih, atau posisi user
     final infoPoint = _selectedDestination ?? _userLocation;
 
     return Scaffold(
@@ -349,7 +325,7 @@ class _LbsScreenState extends State<LbsScreen> {
           ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : Column(
               children: [
-                // 1. PETA OPENSTREETMAP
+               
                 SizedBox(
                   height: 260,
                   width: double.infinity,
@@ -369,7 +345,6 @@ class _LbsScreenState extends State<LbsScreen> {
                             tileProvider: CancellableNetworkTileProvider(),
                           ),
 
-                          // Garis rute jika ada lokasi terpilih
                           if (_selectedDestination != null)
                             PolylineLayer(
                               polylines: [
@@ -386,7 +361,7 @@ class _LbsScreenState extends State<LbsScreen> {
 
                           MarkerLayer(
                             markers: [
-                              // Posisi pengguna (biru)
+                             
                               Marker(
                                 point: _userLocation,
                                 width: 40,
@@ -515,7 +490,6 @@ class _LbsScreenState extends State<LbsScreen> {
                   ),
                 ),
 
-                // 2. FILTER RADIUS
                 Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
@@ -590,9 +564,6 @@ class _LbsScreenState extends State<LbsScreen> {
                                 contentPadding: const EdgeInsets.all(8),
                                 leading: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  // CachedNetworkImage, tetap tampil saat offline.
-                                  // URL kosong langsung pakai ikon (tanpa error),
-                                  // error load dicatat di Debug Console.
                                   child: (item['foto_url'] as String)
                                           .trim()
                                           .isEmpty

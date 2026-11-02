@@ -172,9 +172,19 @@ class _HomeScreenState extends State<HomeScreen> {
       pinned: true,
       floating: false,
       elevation: 0,
-      backgroundColor: primaryColor,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
       toolbarHeight: 60,
+      // === HEADER BIRU MELENGKUNG ===
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          color: primaryColor,
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        ),
+      ),
+      // ==============================
       title: Text(
         'LelunganJogja',
         style: GoogleFonts.poppins(
@@ -197,11 +207,10 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 8),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(100),
+        preferredSize: const Size.fromHeight(116),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          color: primaryColor,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

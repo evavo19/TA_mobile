@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,7 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final supabase = Supabase.instance.client;
 
-  late final Future<List<WisataModel>> _wisataFuture;
+  static const _bgColor = Color(0xFFF8FAFC);
+
+  late Future<List<WisataModel>> _wisataFuture;
 
   String _searchQuery = '';
   String _selectedCategory = 'Semua';
@@ -52,6 +55,23 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Wisatawan';
   }
 
+  /// Sapaan berdasarkan jam saat ini
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h >= 4 && h < 11) return 'Selamat pagi';
+    if (h >= 11 && h < 15) return 'Selamat siang';
+    if (h >= 15 && h < 18) return 'Selamat sore';
+    return 'Selamat malam';
+  }
+
+  /// Foto profil dari akun (kalau ada)
+  String? get _avatarUrl {
+    final meta = supabase.auth.currentUser?.userMetadata;
+    final url = meta?['avatar_url'] ?? meta?['picture'];
+    if (url == null || url.toString().trim().isEmpty) return null;
+    return url.toString();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -63,11 +83,28 @@ class _HomeScreenState extends State<HomeScreen> {
     return data.map((e) => WisataModel.fromMap(e)).toList();
   }
 
+  /// Dipanggil saat layar ditarik ke bawah
+  Future<void> _refresh() async {
+    final future = _fetchWisata();
+    setState(() => _wisataFuture = future);
+    try {
+      await future;
+    } catch (_) {
+      // error ditampilkan oleh FutureBuilder
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: CustomScrollView(
+      backgroundColor: _bgColor,
+      body: RefreshIndicator(
+        color: primaryColor,
+        // supaya indikator muncul di bawah header, bukan tertutup
+        edgeOffset: MediaQuery.of(context).padding.top + 60 + 140,
+        onRefresh: _refresh,
+        child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           _buildAppBar(context),
 
@@ -95,7 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
           FutureBuilder<List<WisataModel>>(
             future: _wisataFuture,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  snapshot.data == null) {
                 return const SliverToBoxAdapter(
                   child: Center(
                     child: Padding(
@@ -154,7 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      return _WisataCard(wisata: filteredWisata[index]);
+                      return _WisataCard(
+                        wisata: filteredWisata[index],
+                        index: index,
+                      );
                     },
                     childCount: filteredWisata.length,
                   ),
@@ -163,6 +204,35 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar() {
+    final url = _avatarUrl;
+    final initial = _userName.isNotEmpty ? _userName[0].toUpperCase() : 'W';
+
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      child: CircleAvatar(
+        radius: 22,
+        backgroundColor: const Color(0xFFDBEAFE),
+        backgroundImage: url != null ? CachedNetworkImageProvider(url) : null,
+        child: url == null
+            ? Text(
+                initial,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: primaryColor,
+                ),
+              )
+            : null,
       ),
     );
   }
@@ -200,40 +270,55 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const NotificationScreen()),
+              halusRoute(const NotificationScreen()),
             );
           },
         ),
         const SizedBox(width: 8),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(116),
+        preferredSize: const Size.fromHeight(140),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Hai, ',
-                      style: TextStyle(fontWeight: FontWeight.w500),
+              // Avatar + sapaan sesuai jam
+              Row(
+                children: [
+                  _buildAvatar(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$_greeting 👋',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          _userName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
-                    TextSpan(
-                      text: _userName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 18),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-             
+              const SizedBox(height: 14),
+
               TextField(
                 onChanged: (value) {
                   setState(() => _searchQuery = value.toLowerCase());
@@ -284,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: const Color(0xFF10B981),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const LbsScreen()),
+                halusRoute(const LbsScreen()),
               ),
             ),
             _QuickMenuItem(
@@ -293,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: const Color(0xFFF97316),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const WisataGratisScreen()),
+                halusRoute(const WisataGratisScreen()),
               ),
             ),
             _QuickMenuItem(
@@ -302,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: primaryColor,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+                halusRoute(const FeedbackScreen()),
               ),
             ),
             _QuickMenuItem(
@@ -311,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: const Color(0xFF8B5CF6),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const QuizScreen()),
+                halusRoute(const QuizScreen()),
               ),
             ),
           ],
@@ -332,75 +417,11 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!MainScreen.bukaAsistenAI(context, pesan)) {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const ChatbotScreen(pesanAwal: pesan),
-              ),
+              halusRoute(const ChatbotScreen(pesanAwal: pesan)),
             );
           }
         },
-        child: Container(
-          height: 120,
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1550B6), Color(0xFF3B82F6)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.auto_awesome,
-                          color: Colors.amber,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'AI Rekomendasi Wisata',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Wisata terdekat dari lokasimu dan favorit pengunjung',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Colors.white70,
-                size: 36,
-              ),
-            ],
-          ),
-        ),
+        child: const _AiBannerContent(),
       ),
     );
   }
@@ -463,12 +484,36 @@ class _HomeScreenState extends State<HomeScreen> {
 class _WisataCard extends StatelessWidget {
   final WisataModel wisata;
 
-  const _WisataCard({required this.wisata});
+  /// Urutan kartu di daftar, untuk animasi muncul bertahap
+  final int index;
+
+  const _WisataCard({required this.wisata, this.index = 0});
 
   static const primaryColor = Color(0xFF1550B6);
 
   @override
   Widget build(BuildContext context) {
+    final delay = (index > 6 ? 6 : index) * 70;
+
+    // Animasi: kartu fade-in sambil naik dari bawah, kartu bawah sedikit lebih lambat
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 450 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 30 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: _buildCard(context),
+    );
+  }
+
+  Widget _buildCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -487,9 +532,7 @@ class _WisataCard extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => DetailWisataScreen(wisata: wisata),
-            ),
+            halusRoute(DetailWisataScreen(wisata: wisata)),
           );
         },
         child: Column(
@@ -499,13 +542,15 @@ class _WisataCard extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
-          
-              child: CachedNetworkImage(
+
+              child: Hero(
+                tag: 'wisata-${wisata.nama}',
+                child: CachedNetworkImage(
                 imageUrl: wisata.gambarUrl,
                 height: 170,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                memCacheWidth: 600, 
+                memCacheWidth: 600,
                 fadeInDuration: const Duration(milliseconds: 150),
                 placeholder: (context, url) => Container(
                   height: 170,
@@ -523,6 +568,7 @@ class _WisataCard extends StatelessWidget {
                     ),
                   );
                 },
+              ),
               ),
             ),
             Padding(
@@ -658,6 +704,177 @@ class _QuickMenuItem extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Transisi pindah halaman: fade + geser halus dari kanan.
+/// Pakai ini sebagai pengganti MaterialPageRoute.
+Route<T> halusRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    transitionDuration: const Duration(milliseconds: 350),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (_, _, _) => page,
+    transitionsBuilder: (_, animation, _, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.06, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Banner AI: bintang berdenyut pelan + kilau lewat di atas banner.
+class _AiBannerContent extends StatefulWidget {
+  const _AiBannerContent();
+
+  @override
+  State<_AiBannerContent> createState() => _AiBannerContentState();
+}
+
+class _AiBannerContentState extends State<_AiBannerContent>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: 120,
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1550B6), Color(0xFF3B82F6)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+        ),
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = _c.value;
+
+            // Bintang berdenyut pelan (1.0 -> 1.25 -> 1.0)
+            final pulse = 1 + 0.25 * (0.5 + 0.5 * math.sin(t * 2 * math.pi));
+
+            // Kilau menyapu di paruh pertama siklus, lalu jeda
+            final sweep = (t / 0.5).clamp(0.0, 1.0);
+
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      final w = box.maxWidth;
+                      return Stack(
+                        children: [
+                          Positioned(
+                            left: -90 + (w + 180) * Curves.easeInOut.transform(sweep),
+                            top: -20,
+                            bottom: -20,
+                            width: 70,
+                            child: Transform(
+                              transform: Matrix4.skewX(-0.35),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0),
+                                      Colors.white.withValues(alpha: 0.22),
+                                      Colors.white.withValues(alpha: 0),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Transform.scale(
+                                  scale: pulse,
+                                  child: const Icon(
+                                    Icons.auto_awesome,
+                                    color: Colors.amber,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'AI Rekomendasi Wisata',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Wisata terdekat dari lokasimu dan favorit pengunjung',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white70,
+                        size: 36,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

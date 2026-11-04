@@ -270,15 +270,20 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
               children: [
                 Stack(
                   children: [
-                    Image.network(
-                      widget.wisata.gambarUrl,
-                      height: 320,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
+                    // Hero: tag sama dengan gambar di kartu beranda
+                    Hero(
+                      tag: 'wisata-${widget.wisata.nama}',
+                      child: Image.network(
+                        widget.wisata.gambarUrl,
                         height: 320,
-                        color: Colors.grey.shade300,
-                        child: const Icon(Icons.image, size: 60),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Container(
+                          height: 320,
+                          color: Colors.grey.shade300,
+                          child: const Icon(Icons.image, size: 60),
+                        ),
                       ),
                     ),
                     Positioned.fill(

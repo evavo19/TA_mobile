@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/wisata_model.dart';
 import '../services/blockchain_service.dart';
 import '../services/notifikasi_service.dart';
+import 'payment_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   final WisataModel wisata;
@@ -32,7 +33,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   final List<Map<String, String>> _paymentMethods = [
     {'name': 'QRIS', 'desc': 'Scan QR Code secara cepat'},
-    {'name': 'Transfer Bank (BCA/Mandiri)', 'desc': 'Virtual Account Bank'},
+    {'name': 'BCA Virtual Account', 'desc': 'Transfer lewat m-banking / ATM BCA'},
+    {'name': 'Mandiri Virtual Account', 'desc': 'Transfer lewat m-banking / ATM Mandiri'},
     {'name': 'E-Wallet (Gopay/OVO)', 'desc': 'Pembayaran dompet digital'},
   ];
 
@@ -150,6 +152,14 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  String _formatTotal(double value) {
+    return widget.selectedCurrency == 'IDR'
+        ? '${widget.currencySymbol}${value.toStringAsFixed(0)}'
+        : '${widget.currencySymbol}${value.toStringAsFixed(2)}';
+  }
+
+  /// Membuka halaman pembayaran. Tiket baru diterbitkan (blockchain +
+  /// Supabase) SETELAH pembayaran dinyatakan berhasil.
   Future<void> _prosesPembayaran() async {
     if (_selectedDate == null || _isLoading) return;
 
@@ -162,53 +172,86 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
     final String tanggalFormatted =
         '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
+    final double totalHarga = _calculateTotalPrice();
+    final int jumlahTiket = _jumlahTiket;
 
+    // Identitas tiket dibuat di awal: timestamp-nya dipakai sebagai nomor
+    // pesanan, dan ticketId yang sama dipakai saat tiket diterbitkan.
+    final int timestamp = DateTime.now().millisecondsSinceEpoch;
     final String qrCodeId =
-        'https://lelunganjogja.com/ticket?id=${DateTime.now().millisecondsSinceEpoch}&user=${user.id}&wisata=${Uri.encodeComponent(widget.wisata.nama)}';
+        'https://lelunganjogja.com/ticket?id=$timestamp&user=${user.id}&wisata=${Uri.encodeComponent(widget.wisata.nama)}';
+    var tiketTersimpan = false;
 
-    bool berhasil = false;
+    final session = PaymentSession(
+      referenceId: 'LJ-$timestamp',
+      method: _selectedPayment,
+      amount: totalHarga,
+      amountText: _formatTotal(totalHarga),
+      title: 'Pembayaran Tiket',
+      items: [
+        MapEntry('Wisata', widget.wisata.nama),
+        MapEntry('Tanggal kunjungan', tanggalFormatted),
+        MapEntry('Jumlah tiket', '$jumlahTiket orang'),
+      ],
+      onPaid: () async {
+        // Jangan simpan dua kali kalau langkah ini diulang setelah error.
+        if (!tiketTersimpan) {
+          try {
+            await BlockchainService.tambahBlok(
+              userId: user.id,
+              ticketId: qrCodeId,
+              namaWisata: widget.wisata.nama,
+              tanggalKunjungan: tanggalFormatted,
+              jumlahTiket: jumlahTiket,
+              totalHarga: totalHarga,
+              mataUang: widget.selectedCurrency,
+            );
+            tiketTersimpan = true;
+            debugPrint("Berhasil menyimpan tiket ke Supabase!");
+          } on PostgrestException catch (e) {
+            debugPrint("Gagal menyimpan tiket (Postgrest): ${e.code} - ${e.message}");
+            throw Exception('Gagal menyimpan tiket: ${e.message}');
+          }
+        }
 
-    try {
-      await BlockchainService.tambahBlok(
-        userId: user.id,
-        ticketId: qrCodeId,
-        namaWisata: widget.wisata.nama,
-        tanggalKunjungan: tanggalFormatted,
-        jumlahTiket: _jumlahTiket,
-        totalHarga: _calculateTotalPrice(),
-        mataUang: widget.selectedCurrency,
-      );
-      berhasil = true;
-      debugPrint("Berhasil menyimpan tiket ke Supabase!");
-    } on PostgrestException catch (e) {
-      debugPrint("Gagal menyimpan tiket (Postgrest): ${e.code} - ${e.message}");
-      _showErrorSnackBar('Gagal menyimpan tiket: ${e.message}');
-    } catch (e) {
-      debugPrint("Gagal memproses pembayaran: $e");
-      _showErrorSnackBar('Pembayaran gagal: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-
-    if (!berhasil || !mounted) return;
-
-    NotificationService.show(
-      title: 'Pembayaran Berhasil',
-      body: 'Tiket ${widget.wisata.nama} ($_jumlahTiket orang) berhasil dipesan!',
+        // Notifikasi langsung muncul begitu pembayaran berhasil, tanpa
+        // menunggu pengguna keluar dari halaman rincian. Kegagalan notifikasi
+        // tidak boleh membatalkan pembayaran yang sudah berhasil.
+        try {
+          NotificationService.show(
+            title: 'Pembayaran Berhasil',
+            body: 'Tiket ${widget.wisata.nama} ($jumlahTiket orang) berhasil dipesan!',
+          );
+          if (mounted) {
+            _showTopNotification(
+              'Pembayaran Berhasil',
+              'Tiket berhasil disimpan!',
+            );
+          }
+        } catch (e) {
+          debugPrint('Gagal menampilkan notifikasi: $e');
+        }
+      },
     );
 
-    _showTopNotification(
-      'Pembayaran Berhasil',
-      'Tiket berhasil disimpan!',
+    setState(() => _isLoading = true);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentWaitingScreen(session: session),
+      ),
     );
+    if (mounted) setState(() => _isLoading = false);
+
+    // Kembali dari halaman pembayaran: lanjut hanya kalau sudah dibayar.
+    // Kalau belum (keluar / ganti metode), pengguna tetap di form ini.
+    if (!mounted || session.status != PaymentStatus.paid) return;
 
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
-      Navigator.pop(context, true); 
+      Navigator.pop(context, true);
     });
   }
 
@@ -489,7 +532,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
                           : Text(
-                              'Bayar Sekarang',
+                              'Lanjut Bayar',
                               style: GoogleFonts.poppins(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,

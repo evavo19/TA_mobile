@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/user_model.dart';
 import '../models/wisata_model.dart';
 import 'booking_screen.dart';
@@ -99,7 +100,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       if (response == null) {
         isProfileIncomplete = true;
       } else {
-
         final model = UserModel.fromJson(Map<String, dynamic>.from(response));
         final String fullName = (model.fullName as String?) ?? '';
         final String phone = (model.phone as String?) ?? '';
@@ -121,7 +121,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       if (!mounted) return;
 
       if (isProfileIncomplete) {
-  
         showDialog(
           context: context,
           builder: (dialogContext) => Dialog(
@@ -198,11 +197,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () async {
-                            Navigator.pop(dialogContext); 
+                            Navigator.pop(dialogContext);
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                
                                 builder: (context) =>
                                     const MainScreen(initialIndex: 3),
                               ),
@@ -237,7 +235,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
           ),
         );
       } else {
-
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -278,8 +275,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                         height: 320,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Container(
+                        errorBuilder: (context, error, stackTrace) => Container(
                           height: 320,
                           color: Colors.grey.shade300,
                           child: const Icon(Icons.image, size: 60),
@@ -537,7 +533,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           height: 1.6,
                         ),
                       ),
-                      const SizedBox(height: 100),
+                      const SizedBox(height: 130),
                     ],
                   ),
                 ),
@@ -561,6 +557,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                 ],
               ),
               child: SafeArea(
+                top: false, // jangan tambah ruang kosong setinggi status bar di atas
                 child: Row(
                   children: [
                     Expanded(

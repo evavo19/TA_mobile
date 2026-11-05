@@ -104,7 +104,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
     _model = GenerativeModel(
-      model: 'gemini-3.7-flash', // kalau terasa lambat, coba 'gemini-3.7-flash'
+      model: 'gemini-3.8-flash', // kalau terasa lambat, coba 'gemini-3.7-flash'
       apiKey: _geminiApiKey,
       systemInstruction: Content.system(
         'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '
@@ -311,12 +311,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       debugPrint("ERROR CHATBOT: $e");
       _typeTimer?.cancel();
       if (!mounted) return;
-      final pesanError = (e is TimeoutException)
-          ? 'AI terlalu lama merespons. Coba kirim lagi sebentar lagi ya.'
-          : (e.toString().contains('503') ||
-                e.toString().contains('UNAVAILABLE'))
-          ? 'Server AI sedang sibuk. Tunggu beberapa detik lalu coba kirim lagi ya.'
-          : 'Maaf, terjadi kendala saat menghubungi AI. Silakan coba lagi.';
+      // SEMENTARA: tampilkan error asli supaya penyebabnya kelihatan
+      final pesanError = 'ERROR: $e';
       setState(() {
         final i = _streamIndex;
         if (i != null && i < _messages.length) {
@@ -353,7 +349,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       try {
         final stream = _model
             .generateContentStream(content)
-            .timeout(const Duration(seconds: 15));
+            .timeout(const Duration(seconds: 60));
 
         await for (final chunk in stream) {
           if (!mounted) return _typeTarget;
@@ -495,6 +491,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
+    MediaQuery.of(context); // supaya build ulang saat keyboard muncul/hilang
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
@@ -808,6 +806,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             padding: const EdgeInsets.all(12),
             color: Colors.white,
             child: SafeArea(
+              bottom: !keyboardOpen,
               child: Row(
                 children: [
                   IconButton(

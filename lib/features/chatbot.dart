@@ -104,8 +104,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
     _model = GenerativeModel(
-      model:
-          'gemini-3.1-flash-lite', // kalau "not found", coba 'gemini-3.8-flash'
+      model: 'gemini-3.1-flash-lite', // kalau "not found", coba 'gemini-3.8-flash'
       apiKey: _geminiApiKey,
       systemInstruction: Content.system(
         'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '

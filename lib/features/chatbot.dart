@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -6,7 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/wisata_model.dart';
 import '../screens/detail_wisata_screen.dart';
 import '../services/wisata_service.dart' as wisata_svc;
@@ -14,7 +16,6 @@ import '../services/wisata_service.dart' as wisata_svc;
 final ValueNotifier<String?> chatbotPesanMasuk = ValueNotifier<String?>(null);
 
 class ChatbotScreen extends StatefulWidget {
-
   final String? pesanAwal;
 
   const ChatbotScreen({super.key, this.pesanAwal});
@@ -31,7 +32,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   late final String _geminiApiKey;
   late final GenerativeModel _model;
   bool _isLoading = false;
-  bool _loadingHasImage = false; 
+  bool _loadingHasImage = false;
+
+  // Cache data wisata supaya tidak query database berulang tiap pesan
+  List<Map<String, dynamic>> _wisataCache = [];
+  Future<void> _cacheFuture = Future.value();
 
   Uint8List? _selectedImageBytes;
 
@@ -39,29 +44,39 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   double _userLng = 110.3658;
   String _currentLocationName = 'Malioboro, Yogyakarta';
 
+  // State untuk efek "mengetik" ala ChatGPT
+  Timer? _typeTimer;
+  String _typeTarget = ''; // teks lengkap yang sudah diterima dari AI
+  int _typeShown = 0; // jumlah karakter yang sudah ditampilkan
+  int?
+  _streamIndex; // index bubble jawaban AI di _messages (null = belum mulai)
+
   final List<Map<String, dynamic>> _messages = [
     {
       'isUser': false,
-      'text':
-          'Halo! Aku Asisten AI LelunganJogja. Kamu bisa tanya rekomendasi wisata, atau upload foto wisata biar kubantu kenali lokasi dan harga tiketnya!',
+      'text': 'Halo! Aku Asisten AI LelunganJogja. Kamu bisa tanya rekomendasi wisata, atau upload foto wisata biar kubantu kenali lokasi dan harga tiketnya!',
       'cards': <Map<String, dynamic>>[],
       'time': '10:00',
       'imageBytes': null,
-    }
+    },
   ];
+
+  // Titik tiga "sedang mengetik" tampil selama belum ada teks pertama dari AI
+  bool get _showTyping => _isLoading && _streamIndex == null;
 
   @override
   void initState() {
     super.initState();
     _initGemini();
+    _cacheFuture = _loadWisataCache();
     final gps = _initUserGps();
 
     if (widget.pesanAwal != null) {
-      gps
-          .timeout(const Duration(seconds: 8), onTimeout: () {})
-          .whenComplete(() {
-        if (mounted) _sendMessage(widget.pesanAwal!);
-      });
+      gps.timeout(const Duration(seconds: 3), onTimeout: () {}).whenComplete(
+        () {
+          if (mounted) _sendMessage(widget.pesanAwal!);
+        },
+      );
     }
 
     if (widget.pesanAwal == null) {
@@ -78,7 +93,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   @override
   void dispose() {
-    chatbotPesanMasuk.removeListener(_onPesanMasuk); // TAMBAHAN
+    chatbotPesanMasuk.removeListener(_onPesanMasuk);
+    _typeTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -88,17 +104,31 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
     _model = GenerativeModel(
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.7-flash', // kalau terasa lambat, coba 'gemini-3.7-flash'
       apiKey: _geminiApiKey,
       systemInstruction: Content.system(
         'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '
-        'Jika pengguna mengirimkan foto tempat wisata, analisislah gambar tersebut dan sebutkan nama tempat wisata di Yogyakarta yang paling sesuai dari daftar database yang diberikan. '
-        'Kamu hanya boleh menjawab pertanyaan yang berkaitan dengan data wisata di daftar referensi database (kategori apa pun) dan aplikasi LelunganJogja. '
+        'Jika pengguna mengirimkan foto tempat wisata, analisislah gambar tersebut dan sebutkan nama tempat wisata di Yogyakarta yang paling sesuai dari daftar referensi yang diberikan. '
+        'Sebutkan nama tempat dengan jelas di awal jawaban, beserta perkiraan jarak dan harga tiketnya jika relevan. '
+        'Kamu hanya boleh menjawab pertanyaan yang berkaitan dengan data wisata di daftar referensi (kategori apa pun) dan aplikasi LelunganJogja. '
         'Jika pertanyaan di luar topik itu, jawab persis: "Maaf, pertanyaan Anda di luar topik." tanpa tambahan apa pun. '
         'Jika pertanyaan masih seputar wisata atau aplikasi tetapi informasinya tidak ada di daftar referensi, jawab: "Maaf, aku tidak tahu informasi itu." dan jangan mengarang. '
-        'Jawablah secara singkat, ramah, dan informatif.',
+        'Jawablah secara singkat, ramah, dan informatif. '
+        'Tulis dengan teks biasa, jangan pakai format markdown seperti tanda bintang atau pagar.',
       ),
     );
+  }
+
+  // Memuat data wisata sekali di awal (di background)
+  Future<void> _loadWisataCache() async {
+    try {
+      final data = await wisata_svc.WisataService().getWisataList().timeout(
+        const Duration(seconds: 10),
+      );
+      _wisataCache = data.map((w) => Map<String, dynamic>.from(w)).toList();
+    } catch (e) {
+      debugPrint('Gagal memuat cache wisata: $e');
+    }
   }
 
   Future<void> _initUserGps() async {
@@ -111,11 +141,16 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         }
         if (permission == LocationPermission.whileInUse ||
             permission == LocationPermission.always) {
-          Position pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-            ),
-          );
+          // Pakai lokasi terakhir (instan); kalau tidak ada, ambil baru
+          // dengan akurasi sedang dan batas waktu 5 detik.
+          final Position pos =
+              await Geolocator.getLastKnownPosition() ??
+              await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.medium,
+                  timeLimit: Duration(seconds: 5),
+                ),
+              );
           if (!mounted) return;
           setState(() {
             _userLat = pos.latitude;
@@ -128,50 +163,18 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   double _calculateDistance(
-      double lat1, double lon1, double lat2, double lon2) {
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     var p = 0.017453292519943295;
     var c = cos;
-    var a = 0.5 -
+    var a =
+        0.5 -
         c((lat2 - lat1) * p) / 2 +
         c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
-  }
-
-  double _skorFavorit(Map<String, dynamic> w) {
-    final rating = (w['rating'] as num?)?.toDouble() ?? 0;
-    final ulasan = (w['jumlah_ulasan'] as num?)?.toDouble() ?? 0;
-    return rating * log(ulasan + 1);
-  }
-
-  Future<Map<String, List<Map<String, dynamic>>>> _rekomendasiLokal() async {
-    final data = await wisata_svc.WisataService().getWisataList();
-
-    final semua = data.map((w) {
-      final lat = (w['latitude'] as num?)?.toDouble();
-      final lng = (w['longitude'] as num?)?.toDouble();
-      final jarak = (lat == null || lng == null)
-          ? 9999.0
-          : _calculateDistance(_userLat, _userLng, lat, lng);
-
-      final item = Map<String, dynamic>.from(w);
-      item['jarak'] = jarak >= 9999 ? '-' : '${jarak.toStringAsFixed(1)} km';
-      item['jarak_num'] = jarak;
-      item['harga'] = 'Rp ${w['harga_weekday'] ?? 0}';
-      item['foto_url'] = w['foto_uri'] ?? w['foto_url'] ?? '';
-      return item;
-    }).toList();
-
-    final terdekat = semua
-        .where((w) => (w['jarak_num'] as double) < 9999)
-        .toList()
-      ..sort(
-        (a, b) => (a['jarak_num'] as double).compareTo(b['jarak_num'] as double),
-      );
-
-    final favorit = List<Map<String, dynamic>>.from(semua)
-      ..sort((a, b) => _skorFavorit(b).compareTo(_skorFavorit(a)));
-
-    return {'terdekat': terdekat, 'favorit': favorit};
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -194,7 +197,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     }
   }
 
- 
   Future<void> _sendMessage(String text) async {
     if ((text.trim().isEmpty && _selectedImageBytes == null) || _isLoading) {
       return;
@@ -215,189 +217,209 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         'time': _getCurrentTime(),
         'imageBytes': currentImageBytes,
       });
-      _selectedImageBytes = null; 
+      _selectedImageBytes = null;
       _loadingHasImage = currentImageBytes != null;
       _isLoading = true;
+      _streamIndex = null;
+      _typeTarget = '';
+      _typeShown = 0;
     });
 
     _scrollToBottom();
 
     try {
-      List<Map<String, dynamic>> wisataList = [];
-      try {
-        final List<dynamic> allData = await Supabase.instance.client
-            .from('wisata')
-            .select()
-            .limit(50);
-
-        wisataList = allData.map((item) {
-          double itemLat = (item['latitude'] as num?)?.toDouble() ?? 0.0;
-          double itemLng = (item['longitude'] as num?)?.toDouble() ?? 0.0;
-          double distance =
-              _calculateDistance(_userLat, _userLng, itemLat, itemLng);
-
-          Map<String, dynamic> rawItem = Map<String, dynamic>.from(item);
-          rawItem['jarak'] = '${distance.toStringAsFixed(1)} km';
-          rawItem['jarak_num'] = distance;
-          rawItem['harga'] = 'Rp ${item['harga_weekday'] ?? 0}';
-          return rawItem;
-        }).toList();
-      } catch (dbError) {
-        debugPrint("Error fetching Supabase: $dbError");
+      // Tunggu cache yang sudah berjalan di initState (tidak query ganda).
+      // Kalau ternyata kosong (gagal waktu pertama), coba muat sekali lagi.
+      await _cacheFuture;
+      if (_wisataCache.isEmpty) {
+        _cacheFuture = _loadWisataCache();
+        await _cacheFuture;
       }
 
-      String konteksTambahan = '';
-      List<Map<String, dynamic>>? kartuLokal;
+      final List<Map<String, dynamic>> wisataList = _wisataCache.take(20).map((
+        item,
+      ) {
+        final lat = (item['latitude'] as num?)?.toDouble();
+        final lng = (item['longitude'] as num?)?.toDouble();
+        final rawItem = Map<String, dynamic>.from(item);
+        rawItem['jarak'] = (lat == null || lng == null)
+            ? '-'
+            : '${_calculateDistance(_userLat, _userLng, lat, lng).toStringAsFixed(1)} km';
+        rawItem['harga'] = 'Rp ${item['harga_weekday'] ?? 0}';
+        rawItem['foto_url'] = item['foto_uri'] ?? item['foto_url'] ?? '';
+        return rawItem;
+      }).toList();
 
-      final teksKecil = userText.toLowerCase();
-      final mintaFavorit =
-          teksKecil.contains('favorit') || teksKecil.contains('populer');
-      final mintaDekat = teksKecil.contains('dekat');
-
-      if (currentImageBytes == null && (mintaFavorit || mintaDekat)) {
-        final rek = await _rekomendasiLokal();
-        final jumlah = (mintaFavorit && mintaDekat) ? 3 : 5;
-        final terdekat = rek['terdekat']!.take(jumlah).toList();
-        final favorit = rek['favorit']!.take(jumlah).toList();
-
-        final buf = StringBuffer(
-          '\n\nDATA REKOMENDASI HASIL PERHITUNGAN (gunakan ini untuk menjawab):\n',
-        );
-        if (mintaDekat) {
-          buf.writeln('WISATA TERDEKAT (urut dari yang paling dekat):');
-          for (final w in terdekat) {
-            buf.writeln(
-              '- ${w['nama']} | Jarak: ${w['jarak']} | Rating: ${w['rating']} | Tiket: ${w['harga']}',
-            );
-          }
-        }
-        if (mintaFavorit) {
-          buf.writeln('WISATA FAVORIT (rating tinggi dan banyak ulasan):');
-          for (final w in favorit) {
-            buf.writeln(
-              '- ${w['nama']} | Rating: ${w['rating']} | Ulasan: ${w['jumlah_ulasan']} | Tiket: ${w['harga']}',
-            );
-          }
-        }
-        buf.writeln(
-          'Sebutkan nama tempat dengan jelas sesuai urutan daftar, singkat dan ramah.',
-        );
-        konteksTambahan = buf.toString();
-
-        final ids = <dynamic>{};
-        kartuLokal = [
-          if (mintaDekat) ...terdekat,
-          if (mintaFavorit) ...favorit,
-        ].where((w) => ids.add(w['id'])).toList();
-      }
-
-      List<Part> contentParts = [];
-
+      final List<Part> contentParts = [];
       if (currentImageBytes != null) {
         contentParts.add(DataPart('image/jpeg', currentImageBytes));
       }
 
-      String prompt = '''
-Posisi GPS Pengguna saat ini: Latitude $_userLat, Longitude $_userLng.
-Pertanyaan Pengguna: "$userText"
+      // Prompt dibuat pendek: aturan sudah ada di systemInstruction.
+      final daftar = wisataList.isEmpty
+          ? 'Belum ada data referensi.'
+          : wisataList
+                .map(
+                  (w) =>
+                      '- ${w['nama']} | ${w['kategori']} | ${w['harga']} | ${w['jarak']}',
+                )
+                .join('\n');
 
-Berikut adalah daftar referensi tempat wisata di database Supabase kami:
-${wisataList.isEmpty ? "Belum ada data referensi." : wisataList.map((w) => "- Nama: ${w['nama']}, Kategori: ${w['kategori']}, Harga Tiket: ${w['harga']}, Jarak: ${w['jarak']}").join('\n')}
+      contentParts.add(
+        TextPart(
+          'Daftar referensi wisata (nama | kategori | tiket | jarak dari pengguna):\n'
+          '$daftar\n\n'
+          'Pertanyaan pengguna: "$userText"',
+        ),
+      );
 
-Instruksi untuk AI:
-- Jika pengguna mengirim foto, analisislah gambar tersebut dan cari nama tempat yang PALING SESUAI dari daftar referensi di atas.
-- Sebutkan nama tempat wisatanya dengan jelas di awal kalimat balasan, beserta perkiraan jarak dan harga tiketnya.
-- Jika pertanyaan di luar topik wisata/database/aplikasi LelunganJogja, jawab persis: "Maaf, pertanyaan Anda di luar topik."
-- Jika pertanyaan seputar wisata tetapi tidak ada di daftar referensi, jawab: "Maaf, aku tidak tahu informasi itu." Jangan mengarang.
-- Jawablah dengan ramah dan natural.
-''';
+      // Jawaban datang bertahap (streaming) dan tampil dengan efek mengetik.
+      final responseText = await _streamAnswer([Content.multi(contentParts)]);
 
-      prompt += konteksTambahan; 
+      if (!mounted) return;
 
-      contentParts.add(TextPart(prompt));
-
-      final response =
-          await _generateWithRetry([Content.multi(contentParts)]);
-      String responseText = response.text ?? 'Tidak ada respons dari AI.';
-
-      List<Map<String, dynamic>> matchedCards = [];
-      for (var item in wisataList) {
-        String namaWisata = item['nama'].toString().toLowerCase();
-        List<String> keywords = namaWisata.split(' ');
-
-        bool isKeywordMatch = keywords.any(
-            (kw) => kw.length > 3 && responseText.toLowerCase().contains(kw));
-
-        if (responseText.toLowerCase().contains(namaWisata) || isKeywordMatch) {
-          if (!matchedCards.contains(item)) {
-            matchedCards.add(item);
-          }
+      final lower = responseText.toLowerCase();
+      final List<Map<String, dynamic>> matchedCards = [];
+      for (final item in wisataList) {
+        final nama = item['nama'].toString().toLowerCase();
+        final isKeywordMatch = nama
+            .split(' ')
+            .any((kw) => kw.length > 3 && lower.contains(kw));
+        if (lower.contains(nama) || isKeywordMatch) {
+          matchedCards.add(item);
         }
       }
 
-      if (kartuLokal != null && kartuLokal.isNotEmpty) {
-        matchedCards = kartuLokal;
-      }
-
-      if (matchedCards.isEmpty &&
-          currentImageBytes == null &&
-          (userText.toLowerCase().contains('terdekat') ||
-              userText.toLowerCase().contains('dekat'))) {
-        wisataList.sort((a, b) =>
-            (a['jarak_num'] as double).compareTo(b['jarak_num'] as double));
-        matchedCards = wisataList.take(3).toList();
-      }
-
-      if (!mounted) return;
       setState(() {
-        _messages.add({
-          'isUser': false,
-          'text': responseText,
-          'cards': matchedCards,
-          'time': _getCurrentTime(),
-          'imageBytes': null,
-        });
+        final i = _streamIndex;
+        if (i != null && i < _messages.length) {
+          _messages[i]['text'] = responseText;
+          _messages[i]['cards'] = matchedCards;
+        } else {
+          _messages.add({
+            'isUser': false,
+            'text': responseText.isEmpty
+                ? 'Tidak ada respons dari AI.'
+                : responseText,
+            'cards': matchedCards,
+            'time': _getCurrentTime(),
+            'imageBytes': null,
+          });
+        }
       });
     } catch (e) {
       debugPrint("ERROR CHATBOT: $e");
+      _typeTimer?.cancel();
       if (!mounted) return;
+      final pesanError = (e is TimeoutException)
+          ? 'AI terlalu lama merespons. Coba kirim lagi sebentar lagi ya.'
+          : (e.toString().contains('503') ||
+                e.toString().contains('UNAVAILABLE'))
+          ? 'Server AI sedang sibuk. Tunggu beberapa detik lalu coba kirim lagi ya.'
+          : 'Maaf, terjadi kendala saat menghubungi AI. Silakan coba lagi.';
       setState(() {
-        _messages.add({
-          'isUser': false,
-          'text': (e.toString().contains('503') ||
-                  e.toString().contains('UNAVAILABLE'))
-              ? 'Server AI sedang sibuk. Tunggu beberapa detik lalu coba kirim lagi ya.'
-              : 'Maaf, terjadi kendala saat menghubungi AI. Silakan coba lagi.',
-          'cards': <Map<String, dynamic>>[],
-          'time': _getCurrentTime(),
-          'imageBytes': null,
-        });
+        final i = _streamIndex;
+        if (i != null && i < _messages.length) {
+          // Jawaban sudah sebagian tampil: tampilkan semua yang sempat diterima.
+          _messages[i]['text'] = '$_typeTarget\n\n($pesanError)';
+        } else {
+          _messages.add({
+            'isUser': false,
+            'text': pesanError,
+            'cards': <Map<String, dynamic>>[],
+            'time': _getCurrentTime(),
+            'imageBytes': null,
+          });
+        }
       });
     } finally {
+      _typeTimer?.cancel();
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _streamIndex = null;
         });
         _scrollToBottom();
       }
     }
   }
 
-  Future<GenerateContentResponse> _generateWithRetry(
-      List<Content> content) async {
-    const maxAttempts = 3;
-    for (var attempt = 1;; attempt++) {
+  // Menerima jawaban Gemini secara streaming. Bubble jawaban dibuat saat teks
+  // pertama datang, lalu teks "diketik" bertahap oleh _typeTimer.
+  // Retry hanya dilakukan kalau server sibuk DAN belum ada teks yang tampil.
+  Future<String> _streamAnswer(List<Content> content) async {
+    const maxAttempts = 2;
+    for (var attempt = 1; ; attempt++) {
       try {
-        return await _model.generateContent(content);
+        final stream = _model
+            .generateContentStream(content)
+            .timeout(const Duration(seconds: 15));
+
+        await for (final chunk in stream) {
+          if (!mounted) return _typeTarget;
+          final t = chunk.text;
+          if (t == null || t.isEmpty) continue;
+          _typeTarget += t;
+          if (_streamIndex == null) _openStreamBubble();
+        }
+        break;
       } catch (e) {
         final msg = e.toString();
-        final isBusy = msg.contains('503') ||
+        final isBusy =
+            msg.contains('503') ||
             msg.contains('UNAVAILABLE') ||
             msg.contains('429');
-        if (!isBusy || attempt >= maxAttempts) rethrow;
-        await Future.delayed(Duration(seconds: 2 * attempt));
+        if (_streamIndex != null || !isBusy || attempt >= maxAttempts) {
+          rethrow;
+        }
+        await Future.delayed(const Duration(seconds: 1));
       }
     }
+
+    // Tunggu efek mengetik selesai menampilkan semua teks.
+    while (mounted && _typeShown < _typeTarget.length) {
+      await Future.delayed(const Duration(milliseconds: 30));
+    }
+    return _typeTarget;
+  }
+
+  void _openStreamBubble() {
+    setState(() {
+      _messages.add({
+        'isUser': false,
+        'text': '',
+        'cards': <Map<String, dynamic>>[],
+        'time': _getCurrentTime(),
+        'imageBytes': null,
+      });
+      _streamIndex = _messages.length - 1;
+    });
+
+    _typeTimer?.cancel();
+    _typeTimer = Timer.periodic(const Duration(milliseconds: 25), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      final i = _streamIndex;
+      final remaining = _typeTarget.length - _typeShown;
+      if (i == null || remaining <= 0) return;
+
+      // Makin banyak teks tertunda, makin cepat mengetiknya.
+      final step = min(12, max(1, remaining ~/ 10));
+      _typeShown += step;
+
+      // Jangan potong emoji (surrogate pair) di tengah.
+      if (_typeShown < _typeTarget.length) {
+        final cu = _typeTarget.codeUnitAt(_typeShown - 1);
+        if (cu >= 0xD800 && cu <= 0xDBFF) _typeShown++;
+      }
+
+      setState(() {
+        _messages[i]['text'] = _typeTarget.substring(0, _typeShown);
+      });
+      _jumpToBottom();
+    });
   }
 
   String _getCurrentTime() {
@@ -417,6 +439,59 @@ Instruksi untuk AI:
     });
   }
 
+  // Dipakai saat mengetik: langsung lompat, tanpa animasi, supaya tidak patah-patah.
+  void _jumpToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  Widget _buildTypingBubble() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomLeft: Radius.circular(0),
+            bottomRight: Radius.circular(16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(10),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_loadingHasImage)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Menganalisis foto...',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            const _TypingDots(),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
@@ -425,7 +500,6 @@ Instruksi untuk AI:
       backgroundColor: const Color(0xFFF6F8FB),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-       
         leading: widget.pesanAwal != null
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
@@ -467,13 +541,16 @@ Instruksi untuk AI:
       ),
       body: Column(
         children: [
-        
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_showTyping ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index >= _messages.length) {
+                  return _buildTypingBubble();
+                }
+
                 final msg = _messages[index];
                 final isUser = msg['isUser'];
                 final Uint8List? imgBytes = msg['imageBytes'];
@@ -481,8 +558,9 @@ Instruksi untuk AI:
                     List<Map<String, dynamic>>.from(msg['cards'] ?? []);
 
                 return Align(
-                  alignment:
-                      isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(14),
@@ -508,7 +586,6 @@ Instruksi untuk AI:
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Tampilkan foto jika pesan dari user memuat gambar
                         if (imgBytes != null) ...[
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
@@ -529,8 +606,6 @@ Instruksi untuk AI:
                             height: 1.4,
                           ),
                         ),
-
-                        // Card Carousel Gambar Rekomendasi
                         if (cards.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           SizedBox(
@@ -542,15 +617,16 @@ Instruksi untuk AI:
                                 final item = cards[cardIndex];
                                 return GestureDetector(
                                   onTap: () {
-                                    final wisataModel =
-                                        WisataModel.fromMap(item);
+                                    final wisataModel = WisataModel.fromMap(
+                                      item,
+                                    );
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             DetailWisataScreen(
-                                          wisata: wisataModel,
-                                        ),
+                                              wisata: wisataModel,
+                                            ),
                                       ),
                                     );
                                   },
@@ -571,23 +647,24 @@ Instruksi untuk AI:
                                         ClipRRect(
                                           borderRadius:
                                               const BorderRadius.vertical(
-                                            top: Radius.circular(12),
-                                          ),
+                                                top: Radius.circular(12),
+                                              ),
                                           child: Image.network(
                                             item['foto_url'] ?? '',
                                             height: 95,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (context, error,
-                                                    stackTrace) =>
-                                                Container(
-                                              height: 95,
-                                              color: Colors.grey.shade300,
-                                              child: const Icon(
-                                                Icons.landscape,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    Container(
+                                                      height: 95,
+                                                      color:
+                                                          Colors.grey.shade300,
+                                                      child: const Icon(
+                                                        Icons.landscape,
+                                                        color: Colors.grey,
+                                                      ),
+                                                    ),
                                           ),
                                         ),
                                         Padding(
@@ -599,8 +676,7 @@ Instruksi untuk AI:
                                               Text(
                                                 item['nama'] ?? '',
                                                 maxLines: 1,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: GoogleFonts.poppins(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 12,
@@ -618,8 +694,7 @@ Instruksi untuk AI:
                                                   const SizedBox(width: 2),
                                                   Text(
                                                     '${item['rating'] ?? 4.5}',
-                                                    style:
-                                                        GoogleFonts.poppins(
+                                                    style: GoogleFonts.poppins(
                                                       fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -628,8 +703,7 @@ Instruksi untuk AI:
                                                   const Spacer(),
                                                   Text(
                                                     item['harga'] ?? 'Rp 0',
-                                                    style:
-                                                        GoogleFonts.poppins(
+                                                    style: GoogleFonts.poppins(
                                                       fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -657,7 +731,6 @@ Instruksi untuk AI:
                             ),
                           ),
                         ],
-
                         const SizedBox(height: 6),
                         Align(
                           alignment: Alignment.bottomRight,
@@ -676,20 +749,6 @@ Instruksi untuk AI:
               },
             ),
           ),
-
-          if (_isLoading)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6.0),
-              child: Text(
-                _loadingHasImage
-                    ? 'Gemini AI sedang menganalisis gambar & data Supabase...'
-                    : 'Gemini AI sedang mencari jawaban dari data Supabase...',
-                style: GoogleFonts.poppins(
-                    fontSize: 11, color: Colors.grey.shade600),
-              ),
-            ),
-
-          // Preview Gambar yang Dipilih Sebelum Dikirim
           if (_selectedImageBytes != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -723,8 +782,6 @@ Instruksi untuk AI:
                 ],
               ),
             ),
-
-    
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -734,34 +791,30 @@ Instruksi untuk AI:
                   icon: Icons.directions_walk,
                   label: 'Bisa Jalan Kaki',
                   onTap: () => _sendMessage(
-                      'Rekomendasi wisata yang bisa ditempuh jalan kaki'),
+                    'Rekomendasi wisata yang bisa ditempuh jalan kaki',
+                  ),
                 ),
                 _buildQuickChip(
                   icon: Icons.attach_money,
                   label: 'Wisata Rp 20.000',
                   onTap: () => _sendMessage(
-                      'Rekomendasi wisata dengan tiket 20000 dong'),
-                ),
-                _buildQuickChip(
-                  icon: Icons.near_me_outlined,
-                  label: 'Wisata Terdekat',
-                  onTap: () => _sendMessage(
-                      'Rekomendasi wisata terdekat dari lokasiku'),
+                    'Rekomendasi wisata dengan tiket 20000 dong',
+                  ),
                 ),
               ],
             ),
           ),
-
           Container(
             padding: const EdgeInsets.all(12),
             color: Colors.white,
             child: SafeArea(
               child: Row(
                 children: [
-              
                   IconButton(
-                    icon: const Icon(Icons.image_outlined,
-                        color: Color(0xFF1550B6)),
+                    icon: const Icon(
+                      Icons.image_outlined,
+                      color: Color(0xFF1550B6),
+                    ),
                     onPressed: () {
                       showModalBottomSheet(
                         context: context,
@@ -797,11 +850,15 @@ Instruksi untuk AI:
                       decoration: InputDecoration(
                         hintText: 'Tanya atau upload foto wisata...',
                         hintStyle: GoogleFonts.poppins(
-                            fontSize: 13, color: Colors.grey.shade400),
+                          fontSize: 13,
+                          color: Colors.grey.shade400,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF6F8FB),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                           borderSide: BorderSide.none,
@@ -815,8 +872,11 @@ Instruksi untuk AI:
                     backgroundColor: primaryColor,
                     radius: 22,
                     child: IconButton(
-                      icon: const Icon(Icons.send,
-                          color: Colors.white, size: 18),
+                      icon: const Icon(
+                        Icons.send,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       onPressed: () => _sendMessage(_messageController.text),
                     ),
                   ),
@@ -848,11 +908,61 @@ Instruksi untuk AI:
         ),
         backgroundColor: Colors.white,
         side: const BorderSide(color: Color(0xFF1550B6), width: 1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         onPressed: onTap,
       ),
+    );
+  }
+}
+
+// Animasi tiga titik "sedang mengetik" (titik melompat bergantian)
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final t = (_controller.value - i * 0.15) % 1.0;
+            final wave = t < 0.5 ? sin(t * 2 * pi) : 0.0;
+            return Transform.translate(
+              offset: Offset(0, -4 * wave),
+              child: Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade500.withValues(
+                    alpha: 0.4 + 0.6 * wave,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -12,21 +13,41 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-
   bool _isPlaying = false;
   bool _isGameOver = false;
   int _score = 0;
   int _timeLeft = 15;
   Timer? _gameTimer;
-  Timer? _spawnTimer;
+  Timer? _loopTimer;
   StreamSubscription? _accelerometerSubscription;
 
   static const int _targetScore = 60;
 
-  static int _totalKoin = 0; 
+  static int _totalKoin = 0;
   int _koinDidapat = 0;
 
-  double _basketX = 0.5;
+  // ---------------------------------------------------------------------------
+  // PENGATURAN GERAKAN KERANJANG
+  // ---------------------------------------------------------------------------
+  // Ubah angka-angka ini kalau mau menyetel rasa geraknya.
+  static const double _maxTilt = 4.0; // makin kecil = makin sensitif
+  static const double _deadZone = 0.4; // getaran kecil di bawah ini diabaikan
+  static const double _sensorSmoothing = 0.2; // 0..1, makin kecil makin halus
+  static const double _basketFollow = 0.18; // 0..1, makin kecil makin "licin"
+  // Kalau keranjang malah gerak kebalikan arah miring, ubah jadi -1.0
+  static const double _arahTilt = 1.0;
+
+  // Frekuensi game loop (~60 fps)
+  static const int _tickMs = 16;
+  // Kecepatan item awalnya dihitung per 40 ms, jadi disesuaikan ke tick baru.
+  static const double _tickFactor = _tickMs / 40.0;
+
+  double _basketX = 0.5; // posisi keranjang yang ditampilkan
+  double _targetX = 0.5; // posisi tujuan dari sensor
+
+  double _filteredX = 0; // nilai sensor yang sudah dihaluskan
+  double _baselineX = 0; // posisi HP saat game dimulai (dianggap tengah)
+  bool _needCalibrate = true;
 
   final List<_FallingItem> _items = [];
   final Random _random = Random();
@@ -34,23 +55,53 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
+    // Game ini dirancang untuk layar tegak (portrait).
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     _initSensor();
   }
 
   void _initSensor() {
-    _accelerometerSubscription = accelerometerEventStream().listen((event) {
-      if (!_isPlaying) return;
+    _accelerometerSubscription =
+        accelerometerEventStream(
+          samplingPeriod: SensorInterval.gameInterval,
+        ).listen((event) {
+          // Saat HP tegak, miring kiri/kanan terbaca di sumbu X.
+          final raw = event.x;
 
-      setState(() {
-       
-        _basketX -= event.y * 0.04;
+          if (_needCalibrate) {
+            // Posisi HP saat mulai dianggap "lurus", jadi keranjang
+            // tidak langsung bergerak sebelum HP dimiringkan.
+            _filteredX = raw;
+            _baselineX = raw;
+            _needCalibrate = false;
+          } else {
+            // Low-pass filter: meredam getaran tangan.
+            _filteredX =
+                _filteredX * (1 - _sensorSmoothing) + raw * _sensorSmoothing;
+          }
 
-        _basketX = _basketX.clamp(0.05, 0.95);
-      });
-    });
+          if (!_isPlaying) return;
+
+          // Selisih dari posisi awal + zona mati.
+          var dx = _filteredX - _baselineX;
+          if (dx.abs() < _deadZone) {
+            dx = 0;
+          } else {
+            dx = dx > 0 ? dx - _deadZone : dx + _deadZone;
+          }
+
+          // Posisi tujuan (miring ke kanan -> keranjang ke kanan).
+          _targetX = (0.5 - (dx / _maxTilt) * _arahTilt).clamp(0.05, 0.95);
+        });
   }
 
   void _startGame() {
+    _gameTimer?.cancel();
+    _loopTimer?.cancel();
+
     setState(() {
       _isPlaying = true;
       _isGameOver = false;
@@ -58,6 +109,8 @@ class _QuizScreenState extends State<QuizScreen> {
       _timeLeft = 15;
       _items.clear();
       _basketX = 0.5;
+      _targetX = 0.5;
+      _needCalibrate = true; // kalibrasi ulang tiap game dimulai
     });
 
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -70,11 +123,15 @@ class _QuizScreenState extends State<QuizScreen> {
       }
     });
 
-    _spawnTimer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
+    // Satu game loop untuk gerak keranjang + item (lebih mulus dari 40 ms).
+    _loopTimer = Timer.periodic(const Duration(milliseconds: _tickMs), (timer) {
       if (!_isPlaying) return;
 
       setState(() {
-        if (_random.nextDouble() < 0.25) {
+        // Keranjang mengejar posisi tujuan pelan-pelan (efek halus).
+        _basketX += (_targetX - _basketX) * _basketFollow;
+
+        if (_random.nextDouble() < 0.25 * _tickFactor) {
           _items.add(
             _FallingItem(
               x: _random.nextDouble(),
@@ -86,7 +143,7 @@ class _QuizScreenState extends State<QuizScreen> {
         }
 
         for (int i = _items.length - 1; i >= 0; i--) {
-          _items[i].y += _items[i].speed;
+          _items[i].y += _items[i].speed * _tickFactor;
 
           if (_items[i].y >= 0.85 && _items[i].y <= 0.95) {
             if ((_items[i].x - _basketX).abs() < 0.12) {
@@ -106,34 +163,33 @@ class _QuizScreenState extends State<QuizScreen> {
 
   _ItemType _getRandomItemType() {
     double rand = _random.nextDouble();
-    if (rand < 0.40) return _ItemType.ticket; 
-    if (rand < 0.65) return _ItemType.coin; 
-    if (rand < 0.85) return _ItemType.bomb; 
-    return _ItemType.zonk; 
+    if (rand < 0.40) return _ItemType.ticket;
+    if (rand < 0.65) return _ItemType.coin;
+    if (rand < 0.85) return _ItemType.bomb;
+    return _ItemType.zonk;
   }
 
+  // Dipanggil dari dalam setState game loop, jadi tidak perlu setState lagi.
   void _applyItemScore(_ItemType type) {
-    setState(() {
-      switch (type) {
-        case _ItemType.ticket:
-          _score += 10;
-          break;
-        case _ItemType.coin:
-          _score += 20;
-          break;
-        case _ItemType.bomb:
-          _score = max(0, _score - 20);
-          break;
-        case _ItemType.zonk:
-          _score = max(0, _score - 30);
-          break;
-      }
-    });
+    switch (type) {
+      case _ItemType.ticket:
+        _score += 10;
+        break;
+      case _ItemType.coin:
+        _score += 20;
+        break;
+      case _ItemType.bomb:
+        _score = max(0, _score - 20);
+        break;
+      case _ItemType.zonk:
+        _score = max(0, _score - 30);
+        break;
+    }
   }
 
   void _endGame() {
     _gameTimer?.cancel();
-    _spawnTimer?.cancel();
+    _loopTimer?.cancel();
 
     _koinDidapat = _score;
     _totalKoin += _koinDidapat;
@@ -330,8 +386,10 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void dispose() {
     _gameTimer?.cancel();
-    _spawnTimer?.cancel();
+    _loopTimer?.cancel();
     _accelerometerSubscription?.cancel();
+    // Kembalikan orientasi ke pengaturan bawaan perangkat.
+    SystemChrome.setPreferredOrientations([]);
     super.dispose();
   }
 
@@ -466,7 +524,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     vertical: 8,
                                   ),
                                   child: Text(
-                                    'Pegang HP dan miringkan ke kiri/kanan untuk menggerakkan keranjang. Kumpulkan skor setinggi mungkin untuk mendapatkan koin!',
+                                    'Pegang HP dengan nyaman, lalu miringkan ke kiri/kanan untuk menggerakkan keranjang. Posisi HP saat kamu menekan mulai dianggap posisi tengah. Kumpulkan skor setinggi mungkin untuk mendapatkan koin!',
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.poppins(
                                       fontSize: 12,

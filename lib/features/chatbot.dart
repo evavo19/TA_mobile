@@ -104,15 +104,22 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
     _model = GenerativeModel(
-      model: 'gemini-3.8-flash', // kalau terasa lambat, coba 'gemini-3.7-flash'
+      model: 'gemini-3.1-flash-lite', // kalau "not found", coba 'gemini-3.8-flash'
       apiKey: _geminiApiKey,
       systemInstruction: Content.system(
         'Kamu adalah asisten AI pemandu wisata ramah untuk aplikasi "LelunganJogja". '
+        'Setiap pertanyaan dikirim bersama daftar referensi wisata. Setiap baris daftar berisi SEMUA data satu wisata '
+        '(nama, kategori, harga tiket, rating, jumlah ulasan, jam buka, deskripsi, jarak dari pengguna, dan data lain). '
+        'Gunakan semua data itu untuk menjawab. '
+        'Daftar referensi SUDAH disaring oleh aplikasi sesuai filter harga dari pengguna (jika ada), '
+        'jadi jangan menyebut wisata di luar daftar dan jangan menyaring ulang harga sendiri. '
         'Jika pengguna mengirimkan foto tempat wisata, analisislah gambar tersebut dan sebutkan nama tempat wisata di Yogyakarta yang paling sesuai dari daftar referensi yang diberikan. '
         'Sebutkan nama tempat dengan jelas di awal jawaban, beserta perkiraan jarak dan harga tiketnya jika relevan. '
+        'Wisata dianggap bisa ditempuh jalan kaki jika jaraknya sekitar 2 km atau kurang. '
         'Kamu hanya boleh menjawab pertanyaan yang berkaitan dengan data wisata di daftar referensi (kategori apa pun) dan aplikasi LelunganJogja. '
         'Jika pertanyaan di luar topik itu, jawab persis: "Maaf, pertanyaan Anda di luar topik." tanpa tambahan apa pun. '
-        'Jika pertanyaan masih seputar wisata atau aplikasi tetapi informasinya tidak ada di daftar referensi, jawab: "Maaf, aku tidak tahu informasi itu." dan jangan mengarang. '
+        'Jika pertanyaan masih seputar wisata atau aplikasi, jawablah sebisa mungkin dari daftar referensi, walaupun hanya sebagian informasi yang tersedia. '
+        'Jawab "Maaf, aku tidak tahu informasi itu." HANYA jika datanya benar-benar tidak ada di daftar referensi, dan jangan mengarang. '
         'Jawablah secara singkat, ramah, dan informatif. '
         'Tulis dengan teks biasa, jangan pakai format markdown seperti tanda bintang atau pagar.',
       ),
@@ -126,6 +133,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         const Duration(seconds: 10),
       );
       _wisataCache = data.map((w) => Map<String, dynamic>.from(w)).toList();
+      debugPrint('Jumlah wisata di cache: ${_wisataCache.length}');
     } catch (e) {
       debugPrint('Gagal memuat cache wisata: $e');
     }
@@ -175,6 +183,107 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         c((lat2 - lat1) * p) / 2 +
         c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
+  }
+
+  // ---------------------------------------------------------------------------
+  // FILTER HARGA DI KODE (bukan oleh AI)
+  // ---------------------------------------------------------------------------
+  // Mengambil rentang harga dari teks pengguna. Contoh yang dikenali:
+  //  - "15.000 - 30.000", "15000 sampai 30000", "15 ribu - 30 ribu"
+  //  - "di bawah 20 ribu", "maksimal 25rb"
+  //  - "di atas 10 ribu", "minimal 15rb"
+  //  - "tiket 20000", "harga Rp 20.000" (dianggap harga pas)
+  ({int? min, int? max}) _parseRentangHarga(String teks) {
+    final t = teks.toLowerCase();
+
+    int? parse(String angka, String? satuan) {
+      final n = int.tryParse(angka.replaceAll(RegExp(r'[.,]'), ''));
+      if (n == null) return null;
+      if (satuan != null &&
+          (satuan.startsWith('rb') || satuan.startsWith('ribu'))) {
+        return n * 1000;
+      }
+      return n;
+    }
+
+    // Rentang: "15.000 - 30.000" / "15 ribu sampai 30 ribu"
+    final range = RegExp(
+      r'(\d[\d.,]*)\s*(rb|ribu)?\s*(?:-|–|sampai|hingga|s/d|sd)\s*(\d[\d.,]*)\s*(rb|ribu)?',
+    ).firstMatch(t);
+    if (range != null) {
+      final a = parse(range.group(1)!, range.group(2) ?? range.group(4));
+      final b = parse(range.group(3)!, range.group(4) ?? range.group(2));
+      if (a != null && b != null) {
+        return (min: a < b ? a : b, max: a < b ? b : a);
+      }
+    }
+
+    // Batas atas: "di bawah 20 ribu", "maksimal 25rb"
+    final atas = RegExp(
+      r'(?:di bawah|dibawah|maks(?:imal)?|kurang dari|<)\s*(?:rp\.?\s*)?(\d[\d.,]*)\s*(rb|ribu)?',
+    ).firstMatch(t);
+    if (atas != null) {
+      return (min: null, max: parse(atas.group(1)!, atas.group(2)));
+    }
+
+    // Batas bawah: "di atas 10 ribu", "minimal 15rb"
+    final bawah = RegExp(
+      r'(?:di atas|diatas|min(?:imal)?|lebih dari|>)\s*(?:rp\.?\s*)?(\d[\d.,]*)\s*(rb|ribu)?',
+    ).firstMatch(t);
+    if (bawah != null) {
+      return (min: parse(bawah.group(1)!, bawah.group(2)), max: null);
+    }
+
+    // Harga pas: "tiket 20000", "harga Rp 20.000"
+    final pas = RegExp(
+      r'(?:tiket|harga|rp\.?)\s*(?:rp\.?\s*)?(\d[\d.,]*)\s*(rb|ribu)?',
+    ).firstMatch(t);
+    if (pas != null) {
+      final n = parse(pas.group(1)!, pas.group(2));
+      if (n != null) return (min: n, max: n);
+    }
+
+    return (min: null, max: null);
+  }
+
+  // Wisata lolos filter jika harga weekday ATAU weekend masuk rentang.
+  bool _lolosFilterHarga(Map<String, dynamic> w, int? min, int? max) {
+    if (min == null && max == null) return true;
+
+    final weekday = (w['harga_weekday'] as num?)?.toInt() ?? 0;
+    final weekend = (w['harga_weekend'] as num?)?.toInt() ?? weekday;
+
+    bool dalamRentang(int harga) {
+      if (min != null && harga < min) return false;
+      if (max != null && harga > max) return false;
+      return true;
+    }
+
+    return dalamRentang(weekday) || dalamRentang(weekend);
+  }
+
+  // Mengubah satu data wisata jadi satu baris teks berisi SEMUA kolomnya,
+  // supaya Gemini punya informasi lengkap (rating, jam buka, deskripsi, dll).
+  String _ringkasWisata(Map<String, dynamic> w) {
+    const lewati = {
+      'id',
+      'foto_url',
+      'foto_uri',
+      'gambar_url',
+      'latitude',
+      'longitude',
+      'created_at',
+      'updated_at',
+    };
+    final bagian = <String>[];
+    w.forEach((k, v) {
+      if (lewati.contains(k) || v == null) return;
+      var s = v.toString().trim();
+      if (s.isEmpty) return;
+      if (s.length > 250) s = '${s.substring(0, 250)}...';
+      bagian.add('$k: $s');
+    });
+    return '- ${bagian.join(' | ')}';
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -236,9 +345,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         await _cacheFuture;
       }
 
-      final List<Map<String, dynamic>> wisataList = _wisataCache.take(20).map((
-        item,
-      ) {
+      // Semua wisata disiapkan (tidak dibatasi 20), lengkap dengan jarak & harga.
+      final List<Map<String, dynamic>> wisataList = _wisataCache.map((item) {
         final lat = (item['latitude'] as num?)?.toDouble();
         final lng = (item['longitude'] as num?)?.toDouble();
         final rawItem = Map<String, dynamic>.from(item);
@@ -250,24 +358,36 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         return rawItem;
       }).toList();
 
+      // Filter harga dilakukan di kode supaya akurat, bukan oleh Gemini.
+      final rentang = _parseRentangHarga(userText);
+      final bool adaFilterHarga = rentang.min != null || rentang.max != null;
+      final List<Map<String, dynamic>> wisataFiltered = wisataList
+          .where((w) => _lolosFilterHarga(w, rentang.min, rentang.max))
+          .toList();
+
+      debugPrint(
+        'Filter harga: min=${rentang.min}, max=${rentang.max} '
+        '-> ${wisataFiltered.length}/${wisataList.length} wisata',
+      );
+
       final List<Part> contentParts = [];
       if (currentImageBytes != null) {
         contentParts.add(DataPart('image/jpeg', currentImageBytes));
       }
 
-      // Prompt dibuat pendek: aturan sudah ada di systemInstruction.
-      final daftar = wisataList.isEmpty
-          ? 'Belum ada data referensi.'
-          : wisataList
-                .map(
-                  (w) =>
-                      '- ${w['nama']} | ${w['kategori']} | ${w['harga']} | ${w['jarak']}',
-                )
-                .join('\n');
+      // Aturan sudah ada di systemInstruction; di sini hanya data + pertanyaan.
+      final String daftar;
+      if (wisataFiltered.isEmpty) {
+        daftar = adaFilterHarga
+            ? 'Tidak ada wisata yang cocok dengan filter harga dari pengguna.'
+            : 'Belum ada data referensi.';
+      } else {
+        daftar = wisataFiltered.map(_ringkasWisata).join('\n');
+      }
 
       contentParts.add(
         TextPart(
-          'Daftar referensi wisata (nama | kategori | tiket | jarak dari pengguna):\n'
+          'Daftar referensi wisata (satu baris = satu wisata, lengkap dengan jarak dari pengguna):\n'
           '$daftar\n\n'
           'Pertanyaan pengguna: "$userText"',
         ),
@@ -278,17 +398,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
       if (!mounted) return;
 
+      // Kartu hanya dari wisata yang lolos filter, dan hanya jika NAMA LENGKAP
+      // disebut di jawaban (tidak lagi mencocokkan per kata umum seperti "Pantai").
       final lower = responseText.toLowerCase();
-      final List<Map<String, dynamic>> matchedCards = [];
-      for (final item in wisataList) {
-        final nama = item['nama'].toString().toLowerCase();
-        final isKeywordMatch = nama
-            .split(' ')
-            .any((kw) => kw.length > 3 && lower.contains(kw));
-        if (lower.contains(nama) || isKeywordMatch) {
-          matchedCards.add(item);
-        }
-      }
+      final List<Map<String, dynamic>> matchedCards = wisataFiltered.where((
+        item,
+      ) {
+        final nama = (item['nama'] ?? '').toString().toLowerCase().trim();
+        return nama.isNotEmpty && lower.contains(nama);
+      }).toList();
 
       setState(() {
         final i = _streamIndex;
@@ -311,8 +429,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       debugPrint("ERROR CHATBOT: $e");
       _typeTimer?.cancel();
       if (!mounted) return;
-      // SEMENTARA: tampilkan error asli supaya penyebabnya kelihatan
-      final pesanError = 'ERROR: $e';
+      final pesanError = (e is TimeoutException)
+          ? 'AI terlalu lama merespons. Coba kirim lagi sebentar lagi ya.'
+          : (e.toString().contains('503') ||
+                e.toString().contains('UNAVAILABLE'))
+          ? 'Server AI sedang sibuk. Tunggu beberapa detik lalu coba kirim lagi ya.'
+          : 'Maaf, terjadi kendala saat menghubungi AI. Silakan coba lagi.';
       setState(() {
         final i = _streamIndex;
         if (i != null && i < _messages.length) {
@@ -349,7 +471,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       try {
         final stream = _model
             .generateContentStream(content)
-            .timeout(const Duration(seconds: 60));
+            .timeout(const Duration(seconds: 40));
 
         await for (final chunk in stream) {
           if (!mounted) return _typeTarget;
@@ -491,8 +613,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
-    MediaQuery.of(context); // supaya build ulang saat keyboard muncul/hilang
-    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
@@ -806,7 +926,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             padding: const EdgeInsets.all(12),
             color: Colors.white,
             child: SafeArea(
-              bottom: !keyboardOpen,
               child: Row(
                 children: [
                   IconButton(

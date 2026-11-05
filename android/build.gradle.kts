@@ -1,3 +1,16 @@
+subprojects {
+    if (name != "app") {
+        afterEvaluate {
+            val androidExt = extensions.findByName("android")
+            if (androidExt != null) {
+                androidExt.javaClass.methods
+                    .firstOrNull { it.name == "setCompileSdk" && it.parameterCount == 1 }
+                    ?.invoke(androidExt, 36)
+            }
+        }
+    }
+}
+
 allprojects {
     repositories {
         google()

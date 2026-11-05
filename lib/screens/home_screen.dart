@@ -7,9 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/wisata_model.dart';
 import 'detail_wisata_screen.dart';
 import 'notifikasi_screen.dart';
+import 'ai_wisata.dart';
 import 'wisata_gratis_screen.dart';
-import '../features/chatbot.dart'; 
-import 'main_screen.dart'; 
 import '../features/game.dart'; 
 import '../features/feedback.dart'; 
 import '../services/gps_service.dart'; 
@@ -410,17 +409,10 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          const pesan =
-              'Rekomendasikan wisata terdekat dari lokasiku dan wisata favorit pengunjung.';
-
-          if (!MainScreen.bukaAsistenAI(context, pesan)) {
-            Navigator.push(
-              context,
-              halusRoute(const ChatbotScreen(pesanAwal: pesan)),
-            );
-          }
-        },
+        onTap: () => Navigator.push(
+          context,
+          halusRoute(const RekomendasiWisataScreen()),
+        ),
         child: const _AiBannerContent(),
       ),
     );
@@ -852,7 +844,7 @@ class _AiBannerContentState extends State<_AiBannerContent>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Wisata terdekat dari lokasimu dan favorit pengunjung',
+                              'Dihitung dari alamat rumah, rating, dan favorit pengunjung',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.poppins(

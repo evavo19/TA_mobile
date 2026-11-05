@@ -77,6 +77,11 @@ class _MainScreenState extends State<MainScreen>
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
 
+    // Context ini ada di atas Scaffold, jadi viewInsets masih nilai asli keyboard.
+    // Saat keyboard terbuka, bar bawah & tombol kompas disembunyikan supaya
+    // area halaman (termasuk kotak chat) langsung menempel di atas keyboard.
+    final keyboardTerbuka = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
 
@@ -87,91 +92,107 @@ class _MainScreenState extends State<MainScreen>
         child: IndexedStack(index: _index, children: _pages),
       ),
 
-      floatingActionButton: Transform.translate(
-        offset: const Offset(0, _fabDropOffset),
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withAlpha(100),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+      floatingActionButton: keyboardTerbuka
+          ? null
+          : Transform.translate(
+              offset: const Offset(0, _fabDropOffset),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withAlpha(100),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: FloatingActionButton(
+                  heroTag: null,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CompassScreen(),
+                      ),
+                    );
+                  },
+                  backgroundColor: primaryColor,
+                  elevation: 0,
+                  shape: const CircleBorder(),
+                  child: const Icon(
+                    Icons.explore_outlined,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
               ),
-            ],
-          ),
-          child: FloatingActionButton(
-            heroTag: null,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CompassScreen()),
-              );
-            },
-            backgroundColor: primaryColor,
-            elevation: 0,
-            shape: const CircleBorder(),
-            child: const Icon(
-              Icons.explore_outlined,
-              color: Colors.white,
-              size: 30,
             ),
-          ),
-        ),
-      ),
 
       floatingActionButtonLocation: const _DockedNoSnackBarLocation(),
 
       floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
 
-      bottomNavigationBar: CustomPaint(
-        painter: _NotchedBarPainter(
-          notchMargin: _notchMargin,
-          fabDiameter: _fabDiameter,
-          fabDropOffset: _fabDropOffset,
-          borderColor: Colors.grey.shade300,
-          shadowColor: Colors.black.withAlpha(40),
-          drawBorder: false,
-        ),
-        foregroundPainter: _NotchedBarPainter(
-          notchMargin: _notchMargin,
-          fabDiameter: _fabDiameter,
-          fabDropOffset: _fabDropOffset,
-          borderColor: Colors.grey.shade300,
-          shadowColor: Colors.black.withAlpha(40),
-          drawBorder: true,
-        ),
-        child: BottomAppBar(
-          shape: null,
-          color: Colors.transparent,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          padding: EdgeInsets.zero,
-          child: SizedBox(
-            height: 54,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home_rounded, 'Beranda', 0, primaryColor),
-                _buildNavItem(
-                  Icons.confirmation_number_rounded,
-                  'Tiket Saya',
-                  1,
-                  primaryColor,
+      bottomNavigationBar: keyboardTerbuka
+          ? null
+          : CustomPaint(
+              painter: _NotchedBarPainter(
+                notchMargin: _notchMargin,
+                fabDiameter: _fabDiameter,
+                fabDropOffset: _fabDropOffset,
+                borderColor: Colors.grey.shade300,
+                shadowColor: Colors.black.withAlpha(40),
+                drawBorder: false,
+              ),
+              foregroundPainter: _NotchedBarPainter(
+                notchMargin: _notchMargin,
+                fabDiameter: _fabDiameter,
+                fabDropOffset: _fabDropOffset,
+                borderColor: Colors.grey.shade300,
+                shadowColor: Colors.black.withAlpha(40),
+                drawBorder: true,
+              ),
+              child: BottomAppBar(
+                shape: null,
+                color: Colors.transparent,
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                padding: EdgeInsets.zero,
+                child: SizedBox(
+                  height: 54,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildNavItem(
+                        Icons.home_rounded,
+                        'Beranda',
+                        0,
+                        primaryColor,
+                      ),
+                      _buildNavItem(
+                        Icons.confirmation_number_rounded,
+                        'Tiket Saya',
+                        1,
+                        primaryColor,
+                      ),
+                      const SizedBox(width: 48),
+                      _buildNavItem(
+                        Icons.smart_toy_rounded,
+                        'Asisten AI',
+                        2,
+                        primaryColor,
+                      ),
+                      _buildNavItem(
+                        Icons.person_rounded,
+                        'Profil',
+                        3,
+                        primaryColor,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 48),
-                _buildNavItem(
-                  Icons.smart_toy_rounded,
-                  'Asisten AI',
-                  2,
-                  primaryColor,
-                ),
-                _buildNavItem(Icons.person_rounded, 'Profil', 3, primaryColor),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 

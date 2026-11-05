@@ -113,8 +113,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         'Gunakan semua data itu untuk menjawab. '
         'Daftar referensi SUDAH disaring oleh aplikasi sesuai filter harga dari pengguna (jika ada), '
         'jadi jangan menyebut wisata di luar daftar dan jangan menyaring ulang harga sendiri. '
-        'Jika pengguna mengirimkan foto tempat wisata, analisislah gambar tersebut dan sebutkan nama tempat wisata di Yogyakarta yang paling sesuai dari daftar referensi yang diberikan. '
-        'Sebutkan nama tempat dengan jelas di awal jawaban, beserta perkiraan jarak dan harga tiketnya jika relevan. '
+        'Jika pengguna mengirimkan foto, pertama perhatikan objek utama di foto '
+        '(misalnya patung elang besar di atas tugu, tulisan, bentuk bangunan, pemandangan sekitar), '
+        'lalu cocokkan dengan nama, kategori, dan deskripsi di daftar referensi. '
+        'Pilih hanya jika kamu yakin. Jangan memilih hanya karena kemiripan umum, misalnya sama-sama berupa tugu atau monumen. '
+        'Jika cocok, sebutkan nama tempat dengan jelas di awal jawaban, beserta perkiraan jarak dan harga tiketnya jika relevan. '
+        'Jika tidak ada yang cocok, katakan bahwa tempat itu tidak ada di daftar referensi, '
+        'lalu sebutkan perkiraanmu berdasarkan isi foto dan jelaskan bahwa itu belum tentu akurat. '
         'Wisata dianggap bisa ditempuh jalan kaki jika jaraknya sekitar 2 km atau kurang. '
         'Kamu hanya boleh menjawab pertanyaan yang berkaitan dengan data wisata di daftar referensi (kategori apa pun) dan aplikasi LelunganJogja. '
         'Jika pertanyaan di luar topik itu, jawab persis: "Maaf, pertanyaan Anda di luar topik." tanpa tambahan apa pun. '
@@ -290,9 +295,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
-        imageQuality: 70,
-        maxWidth: 800,
-        maxHeight: 800,
+        // Kualitas & ukuran dinaikkan supaya detail (patung, tulisan) tidak hilang.
+        imageQuality: 85,
+        maxWidth: 1280,
+        maxHeight: 1280,
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
@@ -385,8 +391,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         daftar = wisataFiltered.map(_ringkasWisata).join('\n');
       }
 
+      // Petunjuk tambahan khusus saat pengguna mengirim foto.
+      final infoFoto = currentImageBytes != null
+          ? 'Pengguna mengirim foto. Perhatikan detail khas di foto (patung, tulisan, bentuk bangunan, pemandangan sekitar) untuk membedakan tempat yang namanya mirip.\n\n'
+          : '';
+
       contentParts.add(
         TextPart(
+          '$infoFoto'
           'Daftar referensi wisata (satu baris = satu wisata, lengkap dengan jarak dari pengguna):\n'
           '$daftar\n\n'
           'Pertanyaan pengguna: "$userText"',
@@ -613,6 +625,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1550B6);
+
+    // Saat keyboard terbuka, Scaffold sudah menaikkan body di atas keyboard.
+    // SafeArea bawah dimatikan supaya jarak tidak terhitung dua kali.
+    final keyboardTerbuka = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
@@ -926,7 +942,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             padding: const EdgeInsets.all(12),
             color: Colors.white,
             child: SafeArea(
+              top: false,
+              bottom: !keyboardTerbuka,
               child: Row(
+                // Ikon & tombol kirim tetap di bawah saat kotak teks membesar.
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   IconButton(
                     icon: const Icon(
@@ -965,6 +985,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     child: TextField(
                       controller: _messageController,
                       style: GoogleFonts.poppins(fontSize: 14),
+                      // Teks panjang turun ke baris baru (maksimal 5 baris,
+                      // setelah itu bisa di-scroll di dalam kotak).
+                      minLines: 1,
+                      maxLines: 5,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
                         hintText: 'Tanya atau upload foto wisata...',
                         hintStyle: GoogleFonts.poppins(
@@ -982,20 +1009,24 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                           borderSide: BorderSide.none,
                         ),
                       ),
-                      onSubmitted: _sendMessage,
+                      // onSubmitted dihapus: Enter sekarang membuat baris baru.
+                      // Kirim lewat tombol kirim di kanan.
                     ),
                   ),
                   const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: primaryColor,
-                    radius: 22,
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                        size: 18,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: CircleAvatar(
+                      backgroundColor: primaryColor,
+                      radius: 22,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.send,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        onPressed: () => _sendMessage(_messageController.text),
                       ),
-                      onPressed: () => _sendMessage(_messageController.text),
                     ),
                   ),
                 ],

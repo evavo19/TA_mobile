@@ -130,6 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+
+//Penjelasan ke Dosen: "Password dienkripsi secara aman oleh Supabase (hashing)
+//dan sistem menyimpan Session otomatis agar user tidak perlu login ulang."
   Future<void> _handleLogin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text;
@@ -156,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Login menggunakan Supabase Auth
+      // 1. Proses Autentikasi & Enkripsi Password via Supabase Auth
       final response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
@@ -171,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (metadataRole != null && metadataRole.toString().isNotEmpty) {
           userRole = metadataRole.toString().trim().toLowerCase();
         } else {
-          // Opsi B: Jika metadata kosong, fallback mengambil dari tabel profiles[cite: 1, 2]
+          // Opsi B: Jika metadata kosong, fallback mengambil dari tabel profiles
           try {
             final profileResponse = await _supabase
                 .from('profiles')
@@ -190,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
         debugPrint("DEBUG: Login Berhasil | Email: $email | Role terdeteksi: $userRole");
 
         if (mounted) {
-          // 2. Navigasi berbasis Role (Menggunakan pushAndRemoveUntil agar bersih)[cite: 1]
+          // 2. Pengarahan halaman berdasarkan Role setelah Session aktif
           if (userRole == 'petugas' || userRole == 'admin') {
             Navigator.pushAndRemoveUntil(
               context,
@@ -226,6 +229,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // LOGIN BIOMETRIK (SIDIK JARI / FACE ID)
+  // Penjelasan ke Dosen: "Memakai package local_auth untuk mendeteksi sensor
+  // perangkat, lalu mencocokkan session aktif dari Supabase."
   Future<void> _handleBiometricLogin() async {
     try {
       bool canAuthenticate =
@@ -240,6 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      // Memanggil pop-up sensor sidik jari bawaan HP
       bool authenticated = await auth.authenticate(
         localizedReason:
             'Pindai sidik jari/wajah untuk masuk ke LelunganJogja!',
@@ -247,6 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (authenticated && mounted) {
+        // Pengecekan Session Aktif yang tersimpan di perangkat
         final session = _supabase.auth.currentSession;
 
         if (session != null) {
@@ -305,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
     const primaryColor = Color(0xFF1550B6);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.white, //<-- Ini yang bikin latar belakangnya putih
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -315,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 260,
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: primaryColor,
+                    color: primaryColor, // <-- Warna biru penutupnya gambar tugu jogja
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(28),
                       bottomRight: Radius.circular(28),
@@ -331,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Opacity(
                       opacity: 0.2,
                       child: Image.network(
-                        'https://i.ibb.co.com/TBwcqkbc/tugu-jogja-HD.png',
+                        'https://i.ibb.co.com/TBwcqkbc/tugu-jogja-HD.png', // <-- Ini link gambar latarnya
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -355,7 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'LelunganJogja!',
                         style: GoogleFonts.poppins(
-                          color: Colors.white,
+                          color: Colors.white, // <-- Ini yang mengatur warna tulisannya putih
                           fontSize: 30,
                           fontWeight: FontWeight.bold,
                         ),
@@ -385,7 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: InputDecoration(
                       labelText: 'Email',
                       labelStyle: GoogleFonts.poppins(
-                        color: Colors.grey,
+                        color: Colors.grey, // <-- Ini warna kotak abu-abu muda kotak input email
                         fontSize: 14,
                       ),
                       prefixIcon: const Icon(
@@ -467,7 +475,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
+                              backgroundColor: primaryColor, // <-- Ini yang mengatur warna tombol Masuk (backgroundColor: Colors.yellow,)
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(26),
@@ -501,12 +509,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 52,
                           height: 52,
                           decoration: const BoxDecoration(
-                            color: primaryColor,
+                            color: primaryColor, // <-- Ini yang mengatur warna latar lingkaran ikon sidik jari
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.fingerprint,
-                            color: Colors.white,
+                            color: Colors.white, // <-- Ini warna gambar sidik jarinya (putih)
                             size: 28,
                           ),
                         ),

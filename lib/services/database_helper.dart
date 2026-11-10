@@ -1,6 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+
+// PENYIMPANAN LOKAL (SQLITE)
+// Penjelasan ke Dosen: "Class ini mengatur pembuatan database SQLite lokal 
+// bernama 'lelungan_jogja.db' untuk menyimpan data wisata secara offline."
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
@@ -28,6 +32,7 @@ class DatabaseHelper {
     );
   }
 
+  // Membuat struktur tabel lokal SQLite
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE wisata (
@@ -46,6 +51,7 @@ class DatabaseHelper {
     ''');
   }
 
+  // Menyimpan data wisata dari server ke SQLite (Sinkronisasi Offline)
   Future<void> insertWisata(Map<String, dynamic> row) async {
     final db = await instance.database;
     await db.insert(
@@ -55,6 +61,7 @@ class DatabaseHelper {
     );
   }
 
+  // Mengambil data dari database lokal SQLite
   Future<List<Map<String, dynamic>>> getLocalWisata() async {
     final db = await instance.database;
     return await db.query('wisata', orderBy: 'id ASC');

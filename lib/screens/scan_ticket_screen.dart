@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../services/blockchain_service.dart';
+
 class ScanTicketScreen extends StatefulWidget {
   const ScanTicketScreen({super.key});
 
@@ -66,7 +68,7 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
       final response = await supabase
           .from('blockchain_tiket')
           .select()
-          .ilike('ticket_id', '%$qrData%')
+          .eq('ticket_id', qrData)
           .limit(
             1,
           ) 
@@ -96,19 +98,107 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
         return;
       }
 
-      await supabase
-          .from('blockchain_tiket')
-          .update({'status': true})
-          .eq('id', varId);
+      // 1. Verifikasi keaslian tiket langsung ke smart contract Sepolia
+      final String hash = (response['hash'] ?? '').toString();
+      final hasil = hash.isEmpty
+          ? const HasilVerifikasi(false, 'Tiket belum memiliki hash.')
+          : await BlockchainService.verifikasiDetail(qrData, hash);
 
       if (!mounted) return;
 
-      response['status'] = true;
+      if (hasil.dipakai) {
+        // Di blockchain sudah terpakai, samakan status di database
+        try {
+          await supabase
+              .from('blockchain_tiket')
+              .update({'status': true})
+              .eq('id', varId);
+        } catch (_) {}
+        if (!mounted) return;
+        response['status'] = true;
+        setState(() {
+          _isLoading = false;
+          _isSuccess = false;
+          _message = "PERINGATAN: Tiket ini sudah pernah digunakan (Hangus)!";
+          _scannedTicketData = response;
+        });
+        return;
+      }
+
+      if (!hasil.valid) {
+        setState(() {
+          _isLoading = false;
+          _isSuccess = false;
+          _message = "Tiket TIDAK VALID di blockchain: ${hasil.pesan}";
+        });
+        return;
+      }
+
+      // 2. Klaim tiket di database secara atomik (hanya berhasil jika
+      //    status masih false/null), supaya dua petugas tidak bisa
+      //    memvalidasi tiket yang sama bersamaan
+      final claimed = await supabase
+          .from('blockchain_tiket')
+          .update({'status': true})
+          .eq('id', varId)
+          .or('status.is.null,status.eq.false')
+          .select();
+
+      if (!mounted) return;
+
+      if (claimed.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _isSuccess = false;
+          _message = "PERINGATAN: Tiket ini sudah pernah digunakan (Hangus)!";
+          _scannedTicketData = response;
+        });
+        return;
+      }
+
+      // 3. Tandai terpakai di smart contract (useTicket)
+      try {
+        final txPakai = await BlockchainService.gunakanTiket(hash);
+        if (!mounted) return;
+        response['status'] = true;
+        response['tx_pakai'] = txPakai;
+      } catch (e) {
+        final String err = e.toString();
+        if (err.contains('sudah dipakai')) {
+          // Ternyata sudah terpakai di blockchain, status database dibiarkan hangus
+          if (!mounted) return;
+          response['status'] = true;
+          setState(() {
+            _isLoading = false;
+            _isSuccess = false;
+            _message = "PERINGATAN: Tiket ini sudah pernah digunakan (Hangus)!";
+            _scannedTicketData = response;
+          });
+          return;
+        }
+
+        // Gagal mencatat di blockchain: kembalikan status database
+        try {
+          await supabase
+              .from('blockchain_tiket')
+              .update({'status': false})
+              .eq('id', varId);
+        } catch (_) {}
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _isSuccess = false;
+          _message =
+              "Gagal mencatat pemakaian di blockchain. Tiket belum hangus, silakan scan ulang. ($err)";
+        });
+        return;
+      }
 
       setState(() {
         _isLoading = false;
         _isSuccess = true;
-        _message = "BERHASIL! Tiket divalidasi & status diubah jadi Hangus.";
+        _message =
+            "BERHASIL! Tiket divalidasi, status Hangus & tercatat di blockchain.";
         _scannedTicketData = response;
       });
     } catch (e) {
@@ -328,6 +418,11 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (_scannedTicketData!['tx_pakai'] != null)
+                        SelectableText(
+                          'Tx Pemakaian: ${_scannedTicketData!['tx_pakai']}',
+                          style: GoogleFonts.firaCode(fontSize: 10),
+                        ),
                     ],
                   ],
                 ),

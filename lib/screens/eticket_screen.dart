@@ -1,4 +1,5 @@
-import 'dart:async'; 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -21,7 +22,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
   PesananModel? _directPesanan;
   List<PesananModel> _listPesanan = [];
   bool _isVerified = true;
-  bool _isVerifying = true; 
+  bool _isVerifying = true;
   bool _isLoading = true;
   String _displayHash = '';
 
@@ -53,6 +54,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
     _ticketSubscription?.cancel();
     super.dispose();
   }
+
   void _subscribeToUserTickets() {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
@@ -64,13 +66,15 @@ class _ETicketScreenState extends State<ETicketScreen> {
         .eq('user_id', currentUser.id)
         .order('id', ascending: false)
         .listen((data) {
-      if (mounted) {
-        setState(() {
-          _listPesanan = data.map((map) => PesananModel.fromMap(map)).toList();
-          _isLoading = false;
+          if (mounted) {
+            setState(() {
+              _listPesanan = data
+                  .map((map) => PesananModel.fromMap(map))
+                  .toList();
+              _isLoading = false;
+            });
+          }
         });
-      }
-    });
   }
 
   void _subscribeToSingleTicket(dynamic ticketId) {
@@ -81,12 +85,12 @@ class _ETicketScreenState extends State<ETicketScreen> {
         .stream(primaryKey: ['id'])
         .eq('id', ticketId)
         .listen((data) {
-      if (data.isNotEmpty && mounted) {
-        setState(() {
-          _directPesanan = PesananModel.fromMap(data.first);
+          if (data.isNotEmpty && mounted) {
+            setState(() {
+              _directPesanan = PesananModel.fromMap(data.first);
+            });
+          }
         });
-      }
-    });
   }
 
   static const Duration _jedaMinimalVerifikasi = Duration(milliseconds: 1500);
@@ -107,7 +111,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
     if (mounted) {
       setState(() {
-        _isVerified = hasil.valid; 
+        _isVerified = hasil.valid || hasil.dipakai;
         _isVerifying = false;
       });
     }
@@ -179,8 +183,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
       body: _isLoading && widget.pesanan == null
           ? const Center(child: CircularProgressIndicator())
           : widget.pesanan != null
-              ? _buildDirectTicketView(primaryColor)
-              : _buildTixIdListView(primaryColor),
+          ? _buildDirectTicketView(primaryColor)
+          : _buildTixIdListView(primaryColor),
     );
   }
 
@@ -216,8 +220,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
                   color: isUsed
                       ? const Color(0xFFFFEBEE)
                       : (_isVerified
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFEBEE)),
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFFFEBEE)),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -227,32 +231,32 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       isUsed
                           ? Icons.block_rounded
                           : (_isVerified
-                              ? Icons.verified_user_rounded
-                              : Icons.gpp_maybe_rounded),
+                                ? Icons.verified_user_rounded
+                                : Icons.gpp_maybe_rounded),
                       size: 16,
                       color: isUsed
                           ? Colors.red.shade700
                           : (_isVerified
-                              ? const Color(0xFF2E7D32)
-                              : Colors.red),
+                                ? const Color(0xFF2E7D32)
+                                : Colors.red),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       isUsed
                           ? 'Sudah Digunakan (Hangus)'
                           : (_isVerifying
-                              ? 'Memverifikasi...'
-                              : (_isVerified
-                                  ? 'Terverifikasi ✓'
-                                  : 'Tiket Tidak Valid')),
+                                ? 'Memverifikasi...'
+                                : (_isVerified
+                                      ? 'Terverifikasi ✓'
+                                      : 'Tiket Tidak Valid')),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isUsed
                             ? Colors.red.shade700
                             : (_isVerified
-                                ? const Color(0xFF2E7D32)
-                                : Colors.red),
+                                  ? const Color(0xFF2E7D32)
+                                  : Colors.red),
                       ),
                     ),
                   ],
@@ -404,10 +408,8 @@ class _ETicketScreenState extends State<ETicketScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ETicketScreen(
-                          pesanan: item,
-                          hashTiket: item.hash,
-                        ),
+                        builder: (context) =>
+                            ETicketScreen(pesanan: item, hashTiket: item.hash),
                       ),
                     );
                   },
